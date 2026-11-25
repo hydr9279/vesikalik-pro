@@ -1,0 +1,52 @@
+name: Kurulum paketi
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  paket:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        varyant: [NVIDIA, Genel]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Bagimliliklar (${{ matrix.varyant }})
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          if ("${{ matrix.varyant }}" -eq "NVIDIA") { pip install -r requirements_nvidia.txt } else { pip install -r requirements_directml.txt }
+      - name: Modelleri indir
+        shell: pwsh
+        run: ./modelleri_indir.ps1
+      - name: Programi derle (PyInstaller)
+        shell: pwsh
+        run: |
+          $extra = @()
+          if ("${{ matrix.varyant }}" -eq "NVIDIA") { $extra += @("--collect-binaries","nvidia") }
+          pyinstaller --noconfirm --clean --windowed --name VesikalikPro --icon ui/assets/app_icon.ico `
+            --add-data "ui;ui" --collect-all onnxruntime --collect-all webview @extra `
+            --hidden-import win32print --hidden-import win32ui --hidden-import win32gui app.py
+          Copy-Item -Recurse -Force models dist/VesikalikPro/models
+      - name: Kurulum dosyasi (Inno Setup)
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DVaryant=${{ matrix.varyant }}" kurulum/vesikalik_pro.iss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HayalMedya_VesikalikPro_${{ matrix.varyant }}
+          path: kurulum/cikti/*
+          compression-level: 0
+          retention-days: 30
+      - name: Surume ekle
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: kurulum/cikti/*

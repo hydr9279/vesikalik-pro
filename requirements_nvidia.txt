@@ -1,0 +1,8 @@
+pywebview>=5.3
+opencv-python>=4.10
+onnxruntime-gpu[cuda,cudnn]>=1.22
+numpy>=1.26,<3
+Pillow>=10.4
+psutil>=5.9
+pywin32>=306
+pyinstaller>=6.10

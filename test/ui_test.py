@@ -1,0 +1,32 @@
+import asyncio, sys
+from playwright.async_api import async_playwright
+OUT='/home/claude/vp/test/shots'
+async def main():
+    import os; os.makedirs(OUT,exist_ok=True)
+    async with async_playwright() as p:
+        b=await p.chromium.launch(executable_path='/usr/bin/google-chrome',args=['--no-sandbox'])
+        pg=await b.new_page(viewport={'width':1440,'height':900})
+        errs=[]; pg.on('pageerror',lambda e: errs.append(str(e))); pg.on('console',lambda m: errs.append('console:'+m.text) if m.type=='error' else None)
+        await pg.goto('http://127.0.0.1:8765/index.html'); await pg.wait_for_timeout(1500)
+        await pg.screenshot(path=f'{OUT}/0_bos.png')
+        await pg.evaluate("yollaEkle(['/home/claude/ornekler/orijinal/IMG_7923.JPG','/home/claude/ornekler/orijinal/IMG_7920.JPG'])")
+        await pg.wait_for_function("S.st && S.st.uygunluk", timeout=120000); await pg.wait_for_timeout(800)
+        await pg.screenshot(path=f'{OUT}/1_baslangic.png')
+        await pg.evaluate("S.ayar.model='isnet'; adimaGit(1)")
+        await pg.wait_for_function("S.adim===1 && !mesgul", timeout=300000); await pg.wait_for_timeout(1500)
+        await pg.screenshot(path=f'{OUT}/2_arkaplan.png')
+        await pg.evaluate("adimaGit(2)"); await pg.wait_for_function("S.adim===2 && !mesgul", timeout=300000); await pg.wait_for_timeout(3000)
+        await pg.screenshot(path=f'{OUT}/3_rotus.png')
+        await pg.evaluate("adimaGit(3)"); await pg.wait_for_function("S.adim===3 && !mesgul", timeout=300000); await pg.wait_for_timeout(1500)
+        await pg.screenshot(path=f'{OUT}/4_olcek.png')
+        await pg.evaluate("adimaGit(4)"); await pg.wait_for_function("S.adim===4 && S.sayfa && !mesgul", timeout=300000); await pg.wait_for_timeout(1500)
+        await pg.screenshot(path=f'{OUT}/5_baski.png')
+        await pg.evaluate("document.documentElement.dataset.tema='acik'; S.fid='ves45'; turSec('ves45').then(()=>adimaGit(1))")
+        await pg.wait_for_function("S.adim===1 && !mesgul", timeout=300000); await pg.wait_for_timeout(500)
+        await pg.evaluate("cagir('set_bg',S.cur,S.fid,{tip:'gradient',degrade:1}).then(r=>{S.st=r;ciz();})"); await pg.wait_for_timeout(2500)
+        await pg.screenshot(path=f'{OUT}/6_vesikalik_acik.png')
+        await pg.evaluate("hakkinda()"); await pg.wait_for_timeout(500); await pg.screenshot(path=f'{OUT}/7_hakkinda.png')
+        await pg.evaluate("kapat(); ayarlar('yazici')"); await pg.wait_for_timeout(800); await pg.screenshot(path=f'{OUT}/8_ayarlar.png')
+        print('ERR',errs[:10])
+        await b.close()
+asyncio.run(main())
