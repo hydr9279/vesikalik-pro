@@ -1,0 +1,29 @@
+﻿HAYAL MEDYA VESİKALIK PRO — SÜRÜM NOTLARI
+HAYDAR ALTINSABAN yapımıdır · Tüm hakları saklıdır
+HAYAL MEDYA · 0312 264 0 888 · Haydar Altınsaban · 0554 990 49 59
+
+SÜRÜM 1.2
+- Saç tipi modları (kıvırcık, dalgalı, düz, kısa/kel, örtülü) ve saça yakınlaşma düğmesi
+- Rötuşta kirpik, kaş, dudak, burun delikleri, bıyık ve sakal koruması; koruma haritası (K)
+- Yüzdelik "geri al" fırçası (G) ve koruma fırçası (P); güvenli rötuş sınırı
+- Otomatik leke işaretlerini silme: tıkla-seç + Delete veya sağ tık
+- Polaroid (Instax Square) modülü: 10x15'e 2 kart, kırpmasız, bulanık dolgu, Hayal Medya çerçevesi
+- Serbest Baskı modülü: 10x15 / 13x18 / 15x21, adet ve pozlama, "Baskıya Hazır" klasörü
+- Toplu işlem, müşteri ayar belleği, gerçek boyutlu baskı önizlemesi
+- Ayarlarda ekran kartı aç/kapat (yalnızca işlemci modu)
+- Yönetici şifresi kaynak koddan çıkarıldı
+
+SÜRÜM 1.1
+- BiRefNet ile arka plan silme, gri hale temizliği, tıkla-düzelt (SAM) ve fırçalar
+- Biyometrik/vize için beyaz fon; vesikalıkta orijinal fon ve 12 degrade
+- Yüz bölgeleme ile yalnız cilde rötuş, LaMa leke onarımı, gözlük yansıması, göz altı, göz-diş beyazlatma, stil öğrenme
+- Hayal Medya örneklerinden ölçülmüş ölçekleme şablonları, uygunluk raporu
+- 10x15 dizimleri, yazıcı profilleri, test sayfası, Kaydet ve Yazdır
+- Arşiv numaralı dosya adları, müşteri arşivi, günlük rapor, online başvuru çıktısı
+- Yönetici kilidi, hızlı mod, kamera klasörü izleme, ayar taşıma, hata kaydı, kısayol rehberi
+
+YAPAY ZEKA MODELLERİ (bilgisayarda, internetsiz çalışır)
+- BiRefNet Portre (MIT), ISNet ve U²-Net (Apache 2.0): arka plan
+- EfficientSAM (Apache 2.0): tıkla-düzelt
+- LaMa (Apache 2.0): leke ve yansıma onarımı
+- BiSeNet yüz bölgeleme (MIT), YuNet (MIT): yüz analizi

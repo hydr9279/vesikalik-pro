@@ -14,6 +14,7 @@ DefaultDirName={autopf}\HayalMedya\VesikalikPro
 DefaultGroupName=Hayal Medya
 OutputDir=cikti
 OutputBaseFilename=HayalMedya_VesikalikPro_{#Surum}_{#Varyant}_Kurulum
+InfoBeforeFile=..\SURUM_NOTLARI.txt
 SetupIconFile=..\ui\assets\app_icon.ico
 UninstallDisplayIcon={app}\VesikalikPro.exe
 Compression=lzma2/ultra64
@@ -27,10 +28,12 @@ Name: "turkish"; MessagesFile: "compiler:Languages\Turkish.isl"
 [Tasks]
 Name: "masaustu"; Description: "Masaüstüne kısayol oluştur"; Flags: checkedonce
 [Files]
+Source: "..\SURUM_NOTLARI.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\dist\VesikalikPro\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 [Icons]
 Name: "{group}\{#Ad}"; Filename: "{app}\VesikalikPro.exe"
 Name: "{autodesktop}\{#Ad}"; Filename: "{app}\VesikalikPro.exe"; Tasks: masaustu
+Name: "{group}\Sürüm notları"; Filename: "{app}\SURUM_NOTLARI.txt"
 Name: "{group}\Kaldır"; Filename: "{uninstallexe}"
 [Run]
 Filename: "{app}\VesikalikPro.exe"; Description: "Programı başlat"; Flags: nowait postinstall skipifsilent
