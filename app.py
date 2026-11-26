@@ -139,7 +139,7 @@ def main(acilis):
     api.window = win
     try:
         win.events.loaded += lambda: acilis.kapat()
-        win.events.shown += lambda: threading.Timer(6.0, acilis.kapat).start()   # yedek: pencere görününce en geç 6 sn
+        win.events.shown += lambda: threading.Timer(1.5, acilis.kapat).start()   # yedek: pencere görününce en geç 1,5 sn
     except Exception:
         pass
     log(f"Program başlatıldı v{VERSION}")
