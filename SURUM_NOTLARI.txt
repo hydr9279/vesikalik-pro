@@ -2,6 +2,19 @@
 HAYDAR ALTINSABAN yapımıdır · Tüm hakları saklıdır
 HAYAL MEDYA · 0312 264 0 888 · Haydar Altınsaban · 0554 990 49 59
 
+SÜRÜM 1.3 (final)
+- Model Laboratuvarı: BiRefNet Portre / Matting / HR Matting / Genel, BEN2 Base, isteğe bağlı RMBG-2.0 ve ViTMatte; aynı fotoğrafta beyaz, koyu, renkli zeminde yan yana karşılaştırma ve uzlaşı önerisi
+- Ayarlar → Modeller: içe aktarma, kapatma, kaldırma, lisans / "Ticari değil" etiketi (ek modeller ayrı paketten)
+- Gelişmiş portre rötuşu (ten örneğine göre 3 ölçekli yumuşatma, yoğunluk çubukları)
+- Klon damgası (boyut, kenar yumuşaklığı, opaklık, hizalı kaynak, geri alma)
+- Keskinleştirme (Unsharp Mask: miktar, yarıçap, eşik, cildi koru)
+- Şekillendir: it/çek, şişir, küçült, otomatik omuz hizalama (yüz bölgesi kilitli)
+- Yeni girdi biçimleri: HEIC, AVIF, WebP, JFIF, TIFF, şeffaf PNG, RAW (NEF, DNG, CR2, ARW ve diğerleri)
+- Ayar çubuklarında ◄ ► hassas ok düğmeleri; degrade iç/dış renk takas düğmesi
+- Arşiv ve raporu sıfırlama (yönetici adı ve şifresi, silmeden önce yedek)
+- Sorun bildir (hata kaydı + ayarlar, fotoğrafsız) ve baskı öncesi son kontrol
+- Açılış önbellek sorunu giderildi
+
 SÜRÜM 1.2
 - Saç tipi modları (kıvırcık, dalgalı, düz, kısa/kel, örtülü) ve saça yakınlaşma düğmesi
 - Rötuşta kirpik, kaş, dudak, burun delikleri, bıyık ve sakal koruması; koruma haritası (K)

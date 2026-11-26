@@ -40,15 +40,50 @@ def set_gpu(acik: bool) -> None:
 
 
 # Modeller ve özellikleri
+IMN = ((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
 MODELS = {
-    "birefnet": {"file": "birefnet_portrait.onnx", "size": 1024, "mean": (0.485, 0.456, 0.406), "std": (0.229, 0.224, 0.225), "sigmoid": True},
-    "isnet": {"file": "isnet-general-use.onnx", "size": 1024, "mean": (0.5, 0.5, 0.5), "std": (1.0, 1.0, 1.0), "sigmoid": False},
-    "u2net": {"file": "u2net_human_seg.onnx", "size": 320, "mean": (0.485, 0.456, 0.406), "std": (0.229, 0.224, 0.225), "sigmoid": False},
+    "birefnet": {"file": "birefnet_portrait.onnx", "size": 1024, "mean": IMN[0], "std": IMN[1], "sigmoid": True,
+                 "ad": "BiRefNet Portre", "grup": "matte", "lisans": "MIT", "ticari": True,
+                 "not": "Portre için eğitilmiş; saç ve omuz kenarında çok iyi (varsayılan)."},
+    "birefnet_matting": {"file": "birefnet_matting.onnx", "size": 1024, "mean": IMN[0], "std": IMN[1], "sigmoid": True,
+                         "ad": "BiRefNet Matting", "grup": "matte", "lisans": "MIT", "ticari": True, "ek": True,
+                         "not": "Yumuşak (alfa) kenarlı matting; ince saç telleri."},
+    "birefnet_hr": {"file": "birefnet_hr_matting.onnx", "size": 2048, "mean": IMN[0], "std": IMN[1], "sigmoid": True,
+                    "ad": "BiRefNet HR Matting (2048)", "grup": "matte", "lisans": "MIT", "ticari": True, "ek": True, "agir": True,
+                    "not": "Yüksek çözünürlük; en ince detay. Ağır: ekran kartı önerilir, yavaştır."},
+    "birefnet_general": {"file": "birefnet_general.onnx", "size": 1024, "mean": IMN[0], "std": IMN[1], "sigmoid": True,
+                         "ad": "BiRefNet Genel", "grup": "matte", "lisans": "MIT", "ticari": True, "ek": True,
+                         "not": "Genel amaçlı; şapka, aksesuar ve karışık sahneler."},
+    "ben2": {"file": "ben2_base.onnx", "size": 1024, "mean": (0.0, 0.0, 0.0), "std": (1.0, 1.0, 1.0), "sigmoid": None,
+             "ad": "BEN2 Base", "grup": "matte", "lisans": "MIT", "ticari": True, "ek": True,
+             "not": "Saç ve yarı saydam kenarlarda güçlü; ayrı bir bakış açısı."},
+    "rmbg2": {"file": "rmbg2.onnx", "size": 1024, "mean": IMN[0], "std": IMN[1], "sigmoid": None,
+              "ad": "RMBG-2.0", "grup": "matte", "lisans": "CC BY-NC 4.0", "ticari": False, "ek": True,
+              "not": "Ticari olmayan lisans. Sorumluluk kullanıcıya aittir."},
+    "vitmatte": {"file": "vitmatte.onnx", "size": 0, "mean": (0.485, 0.456, 0.406), "std": (0.229, 0.224, 0.225), "sigmoid": None,
+                 "ad": "ViTMatte (trimap rafine)", "grup": "rafine", "lisans": "Ağırlıklar ticari değil", "ticari": False, "ek": True,
+                 "not": "Mevcut maskenin belirsiz kenarını rafine eder. Ticari olmayan lisans."},
+    "isnet": {"file": "isnet-general-use.onnx", "size": 1024, "mean": (0.5, 0.5, 0.5), "std": (1.0, 1.0, 1.0), "sigmoid": False,
+              "ad": "ISNet", "grup": "matte", "lisans": "Apache 2.0", "ticari": True, "not": "Detaylı, hafif; yedek."},
+    "u2net": {"file": "u2net_human_seg.onnx", "size": 320, "mean": IMN[0], "std": IMN[1], "sigmoid": False,
+              "ad": "U²-Net İnsan", "grup": "matte", "lisans": "Apache 2.0", "ticari": True, "not": "Hızlı; en düşük kalite."},
     "parse": {"file": "face_parsing_resnet34.onnx"},
     "lama": {"file": "lama.onnx"},
     "sam": {"file": "efficientsam.onnx"},
     "yunet": {"file": "yunet.onnx"},
 }
+MATTE_ORDER = ["birefnet", "birefnet_matting", "birefnet_hr", "birefnet_general", "ben2", "rmbg2", "isnet", "u2net"]
+_KAPALI: set = set()   # ayarlardan kapatılan modeller
+
+
+def set_disabled(keys) -> None:
+    _KAPALI.clear()
+    _KAPALI.update(keys or [])
+
+
+def matte_models() -> list:
+    """Kullanılabilir (dosyası var, kapatılmamış) arka plan modelleri."""
+    return [k for k in MATTE_ORDER if k in MODELS and has_model(k) and k not in _KAPALI]
 
 
 def available_providers() -> list:
@@ -86,7 +121,7 @@ def session(key: str):
         so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
         so.log_severity_level = 3
         # Büyük modeller için bellek dostu çalıştırma (16 GB RAM'li bilgisayar)
-        if key == "birefnet":
+        if key.startswith("birefnet") or key in ("rmbg2", "ben2"):
             so.enable_mem_pattern = False
             so.enable_cpu_mem_arena = False
         last_err = None
@@ -96,7 +131,7 @@ def session(key: str):
                 used = s.get_providers()[0]
                 name = {"CUDAExecutionProvider": "NVIDIA CUDA", "DmlExecutionProvider": "DirectML",
                         "CPUExecutionProvider": "İşlemci (CPU)"}.get(used, used)
-                if key in ("birefnet", "isnet", "lama", "parse"):
+                if key in ("birefnet", "isnet", "lama", "parse") or key in MATTE_ORDER:
                     _PROVIDER_INFO.update(name=name)
                 log(f"Model yüklendi: {key} → {name}")
                 _SESSIONS[key] = s
@@ -128,7 +163,7 @@ def run(key: str, feeds: dict):
 
 
 def best_matte_model(pref: str = "auto") -> str:
-    if pref in ("birefnet", "isnet", "u2net") and has_model(pref):
+    if pref in MATTE_ORDER and has_model(pref) and pref not in _KAPALI:
         return pref
     for k in ("birefnet", "isnet", "u2net"):
         if has_model(k) and _fits(k):
@@ -138,7 +173,7 @@ def best_matte_model(pref: str = "auto") -> str:
 
 def _fits(key: str) -> bool:
     """BiRefNet CPU'da ~9 GB ister; GPU yoksa ve RAM azsa ISNet'e geç."""
-    if key != "birefnet":
+    if key not in ("birefnet", "birefnet_general", "birefnet_matting", "birefnet_hr"):
         return True
     if any(p in available_providers() for p in ("CUDAExecutionProvider", "DmlExecutionProvider")):
         return True

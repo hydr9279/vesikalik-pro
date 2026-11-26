@@ -3,7 +3,7 @@ import os
 import sys
 
 APP_NAME = "Hayal Medya Vesikalık Pro"
-VERSION = "1.2"
+VERSION = "1.3"
 
 
 def app_dir() -> str:
@@ -24,7 +24,17 @@ def find(rel: str) -> str:
     return os.path.join(app_dir(), rel)
 
 
+def extra_model_dir() -> str:
+    """Kullanıcının içe aktardığı modeller (Program Files yazılamayabilir; bu klasör kullanıcıya aittir)."""
+    d = os.path.join(data_dir(), "modeller")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
 def model_path(name: str) -> str:
+    ek = os.path.join(extra_model_dir(), name)
+    if os.path.exists(ek):
+        return ek
     return find(os.path.join("models", name))
 
 

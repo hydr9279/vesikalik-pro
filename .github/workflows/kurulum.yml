@@ -53,3 +53,17 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: kurulum/cikti/*
+
+  ek-modeller:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ek modelleri indir (MIT lisansli)
+        shell: pwsh
+        run: ./ek_modeller_indir.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HayalMedya_EkModelPaketi
+          path: ek_modeller/*.onnx
+          compression-level: 0
+          if-no-files-found: warn

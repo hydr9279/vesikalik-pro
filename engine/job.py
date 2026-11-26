@@ -15,12 +15,12 @@ from .formats import FORMATS, GRADIENTS, GRADIENT_DEFAULTS, SOLIDS, MM, photo_px
 from . import shape as SH
 from .finish import DEFAULT_PRO, DEFAULT_KESKIN, skin_sample_mask, portrait_smooth, clone_apply, unsharp
 from .imgutil import (imread_any, guided_filter, estimate_foreground, hex2bgr, apply_lut)
-from .log import log
+from .log import log, log_exc
 
 SS = 2            # çıktıyı 2 kat büyük işle, sonra küçült (kalite)
 WORK_FACE_H = 950  # çalışma görüntüsünde yüz kutusu yüksekliği (px)
 
-DEFAULT_MATTE = {"model": "auto", "fon_ayikla": 60, "sac_detay": 70, "yumusaklik": 30, "daraltma": 1, "tasma": 80, "sac_temizle": 0, "sac_renk": 0, "sac_modu": "otomatik"}
+DEFAULT_MATTE = {"model": "auto", "fon_ayikla": 60, "sac_detay": 70, "yumusaklik": 30, "daraltma": 1, "tasma": 80, "sac_temizle": 0, "sac_renk": 0, "sac_modu": "otomatik", "vitmatte": False}
 DEFAULT_RETOUCH = {"leke": 55, "yumusatma": 25, "doku": 70, "parlama": 40, "gozalti": 15, "goz_beyaz": 0,
                    "dis_beyaz": 0, "gozluk": 0, "pozlama": 0, "kontrast": 0, "sicaklik": 0, "oto_beyaz": True,
                    "stil": "", "stil_guc": 100, "spots": [], "geri_al": [],
@@ -172,17 +172,27 @@ class Job:
             return
         key = models.best_matte_model(self.matte_params.get("model", "auto"))
         info = models.MODELS[key]
-        prog(0.5, {"birefnet": "Arka plan ayrıştırılıyor (BiRefNet)", "isnet": "Arka plan ayrıştırılıyor (ISNet)",
-                   "u2net": "Arka plan ayrıştırılıyor"}[key])
+        prog(0.5, f"Arka plan ayrıştırılıyor ({info.get('ad', key)})")
         x = models.norm_input(self.W, info["size"], info["mean"], info["std"])
         s = models.session(key)
-        out = models.run(key, {s.get_inputs()[0].name: x})[0][0, 0]
-        if info["sigmoid"]:
+        out = np.squeeze(models.run(key, {s.get_inputs()[0].name: x})[0]).astype(np.float32)
+        if out.ndim == 3:   # çok kanallı çıktı: ilk kanal
+            out = out[0]
+        sg = info["sigmoid"]
+        if sg is None:   # çıktı zaten 0-1 aralığında mı?
+            sg = bool(out.min() < -0.05 or out.max() > 1.05)
+        if sg:
             out = 1 / (1 + np.exp(-out))
         out = (out - out.min()) / max(1e-6, out.max() - out.min())
         self.matte_model = key
         self.A_model = cv2.resize(out.astype(np.float32), (self.W.shape[1], self.W.shape[0]), interpolation=cv2.INTER_CUBIC)
         self.A_model = np.clip(self.A_model, 0, 1)
+        if self.matte_params.get("vitmatte") and models.has_model("vitmatte"):
+            prog(0.6, "Kenar rafine ediliyor (ViTMatte)")
+            try:
+                self.A_model = self._vitmatte_refine(self.A_model)
+            except Exception:
+                log_exc("ViTMatte rafine başarısız (atlandı)")
         # en büyük bileşen (yanlış parçaları at)
         b = (self.A_model > 0.5).astype(np.uint8)
         n, lbl, st, _ = cv2.connectedComponentsWithStats(b, 8)
@@ -205,6 +215,29 @@ class Job:
         self._find_suspicious()
         self.rebuild_alpha()
         prog(0.8, "Maske hazır")
+
+    def _vitmatte_refine(self, A):
+        """ViTMatte: mevcut maskeden trimap üretip belirsiz kenar bandını rafine eder (tek 4 kanallı girdi: RGB + trimap)."""
+        H, W = A.shape
+        k = max(5, int(max(H, W) / 80)) | 1
+        fg = cv2.erode((A > 0.95).astype(np.uint8), np.ones((k, k), np.uint8))
+        bg = 1 - cv2.dilate((A > 0.05).astype(np.uint8), np.ones((k, k), np.uint8))
+        tri = np.full((H, W), 0.5, np.float32)
+        tri[fg > 0] = 1.0
+        tri[bg > 0] = 0.0
+        s = min(1.0, 1024 / max(H, W))
+        h2, w2 = int(round(H * s / 32)) * 32 or 32, int(round(W * s / 32)) * 32 or 32
+        img = cv2.cvtColor(cv2.resize(self.W, (w2, h2), interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
+        info = models.MODELS["vitmatte"]
+        img = (img - np.array(info["mean"], np.float32)) / np.array(info["std"], np.float32)
+        t2 = cv2.resize(tri, (w2, h2), interpolation=cv2.INTER_NEAREST)[..., None]
+        x = np.concatenate([img, (t2 - 0.5) / 0.5], axis=2).transpose(2, 0, 1)[None].astype(np.float32)
+        sess = models.session("vitmatte")
+        out = np.squeeze(models.run("vitmatte", {sess.get_inputs()[0].name: x})[0]).astype(np.float32)
+        out = np.clip(out, 0, 1)
+        out = cv2.resize(out, (W, H), interpolation=cv2.INTER_CUBIC)
+        unk = (tri == 0.5)
+        return np.where(unk, out, A).astype(np.float32)
 
     def _find_suspicious(self):
         u = ((self.A_model > 0.12) & (self.A_model < 0.88)).astype(np.uint8)

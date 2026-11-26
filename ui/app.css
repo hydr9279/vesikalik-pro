@@ -209,3 +209,13 @@ kbd{display:inline-block;min-width:24px;padding:2px 7px;border-radius:6px;border
 .ornek-isaret{position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;border:2px solid #fff;background:rgba(255,190,80,.7);box-shadow:0 0 0 1px #000;pointer-events:none}
 .araclar{flex-wrap:wrap}
 .araclar.alt-y label,.araclar.alt-y .not{white-space:nowrap}
+
+.lab-sec{display:flex;flex-wrap:wrap;gap:8px}
+.lab-m{display:flex;gap:10px;align-items:center;padding:8px 12px;border:1px solid var(--cizgi);border-radius:10px}
+.lab-m small{color:var(--soluk)}
+.zem{display:inline-flex;gap:4px;margin-left:6px}.zem span{width:14px;height:14px;border-radius:4px;border:1px solid var(--cizgi);display:inline-block}
+.lab-sonuc{display:flex;flex-direction:column;gap:12px;max-height:56vh;overflow:auto}
+.lab-kart{border:1px solid var(--cizgi);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:6px}
+.lab-kart.oneri{border-color:var(--vurgu)}
+.lab-b{display:flex;gap:8px;align-items:center}.rozet{font-size:11px;padding:2px 8px;border-radius:99px;background:var(--vurgu);color:#000}.rozet.gri{background:#555;color:#fff}
+.lab-resim{display:flex;gap:6px}.lab-resim img{flex:1;min-width:0;max-width:33%;border-radius:8px}

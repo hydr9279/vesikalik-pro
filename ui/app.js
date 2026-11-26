@@ -56,6 +56,7 @@ let basladi = false;
 async function baslat() {
   if (basladi) return; basladi = true;
   S.init = await api.init();
+  try { const ml = await api.model_listesi(); S.modeller = ml.modeller || []; } catch (e) { S.modeller = []; }
   S.init.formatlar.forEach(f => S.fmt[f.id] = f);
   S.ayar = S.init.ayarlar;
   $("#surum").textContent = S.init.surum;
@@ -664,12 +665,18 @@ function panelBaslangic(p) {
 function panelArkaplan(p) {
   const st = S.st, m = st.matte, f = S.fmt[S.fid];
   const b1 = bolum("YAPAY ZEKA MODELİ");
-  const modeller = [["auto", "Otomatik (en kaliteli)"], ["birefnet", "BiRefNet Portre — en yüksek kalite"], ["isnet", "ISNet — detaylı"], ["u2net", "U²-Net — hızlı"]];
+  const ML = (S.modeller || []).filter(x => x.var && !x.kapali && x.key !== "vitmatte");
+  const modeller = [["auto", "Otomatik (en kaliteli)"], ...(ML.length ? ML : [{key: "birefnet", ad: "BiRefNet Portre"}, {key: "isnet", ad: "ISNet"}, {key: "u2net", ad: "U²-Net"}]).map(x => [x.key, x.ad + (x.ticari === false ? " · ticari değil" : "")])];
   const sel = h(`<select aria-label="Model"></select>`);
-  modeller.forEach(([k, a]) => sel.append(h(`<option value="${k}" ${(m.model || "auto") === k ? "selected" : ""} ${k !== "auto" && !S.init.modeller[k] ? "disabled" : ""}>${a}</option>`)));
+  modeller.forEach(([k, a]) => sel.append(h(`<option value="${k}" ${(m.model || "auto") === k ? "selected" : ""}>${a}</option>`)));
   sel.onchange = async () => { const r = await cagir("matte", S.cur, S.fid, {model: sel.value}, true); if (r.ok) { S.st = r; ciz(); } };
   b1.append(sel);
-  b1.append(h(`<div class="not">Kullanılan: <b>${esc({birefnet: "BiRefNet", isnet: "ISNet", u2net: "U²-Net"}[st.model] || st.model)}</b> · ${esc(st.donanim)}</div>`));
+  const lab = h(`<button class="btn kucuk genis ana">Model Laboratuvarı · modelleri karşılaştır…</button>`);
+  lab.onclick = modelLab;
+  b1.append(lab);
+  if ((S.modeller || []).some(x => x.key === "vitmatte" && x.var && !x.kapali))
+    b1.append(secim("vm", "ViTMatte ile kenar rafine et (ticari değil)", !!m.vitmatte, async v => { const r = await cagir("matte", S.cur, S.fid, {vitmatte: v}, true); if (r.ok) { S.st = r; ciz(); } }, "Saç kenarındaki belirsiz bandı ince ayarlar; yavaştır"));
+  b1.append(h(`<div class="not">Kullanılan: <b>${esc(((S.modeller || []).find(x => x.key === st.model) || {}).ad || st.model)}</b> · ${esc(st.donanim)}</div>`));
   const yb = h(`<div class="satir"><button class="btn kucuk genis" id="bYen">Yeniden hesapla</button><button class="btn kucuk genis" id="bGeri">Son düzeltmeyi geri al</button></div>`);
   $("#bYen", yb).onclick = async () => { const r = await cagir("matte", S.cur, S.fid, null, true); if (r.ok) { S.st = r; ciz(); } };
   $("#bGeri", yb).onclick = geriAl;
@@ -969,11 +976,46 @@ async function stilOgren() {
   modal("Stil öğren", ic);
 }
 
+async function modelLab() {
+  const ml = ((await api.model_listesi()).modeller || []).filter(x => x.var && !x.kapali && x.key !== "vitmatte");
+  S.modeller = (await api.model_listesi()).modeller || S.modeller;
+  const sec = new Set(ml.filter(x => !x.agir).map(x => x.key));
+  const ic = h(`<div class="modal-ic"><div class="not">Aynı fotoğraf seçtiğiniz modellerle ayrı ayrı ayrıştırılır ve beyaz, koyu, renkli zeminde yan yana gösterilir. Saç kenarındaki halelere, kopuk tellere ve kaybolan saça bakın. <b>Bunu kullan</b> ile seçtiğiniz model uygulanır.</div>
+    <div class="lab-sec"></div>
+    <div class="satir" style="justify-content:space-between"><label class="secim">Zeminler: <span class="zem"><span style="background:#fff"></span><span style="background:#23272F"></span><span style="background:#2E7D5B"></span></span></label><button class="btn ana" id="labCalis">Karşılaştır</button></div>
+    <div class="lab-sonuc"></div></div>`);
+  const kutu = $(".lab-sec", ic);
+  ml.forEach(x => {
+    const l = h(`<label class="secim lab-m" title="${esc(x.not)}"><span><b>${esc(x.ad)}</b> <small>${esc(x.lisans)}${x.ticari ? "" : " · ticari değil"}${x.agir ? " · ağır" : ""}</small></span><input type="checkbox" ${sec.has(x.key) ? "checked" : ""}></label>`);
+    $("input", l).onchange = (e) => e.target.checked ? sec.add(x.key) : sec.delete(x.key);
+    kutu.append(l);
+  });
+  if (ml.length < 2) kutu.append(h(`<div class="not">Karşılaştırmak için en az iki model gerekir. Ayarlar → Modeller bölümünden ek modelleri içe aktarın.</div>`));
+  $("#labCalis", ic).onclick = async () => {
+    if (!sec.size) { bildir("En az bir model seçin", true); return; }
+    const so = $(".lab-sonuc", ic); so.innerHTML = `<div class="not">Hesaplanıyor… (model başına birkaç saniye; ağır modeller daha uzun sürer)</div>`;
+    const r = await cagir("model_karsilastir", S.cur, S.fid, [...sec]);
+    so.innerHTML = "";
+    if (!r.ok) return;
+    r.sonuclar.forEach(x => {
+      const k = h(`<div class="lab-kart ${r.oneri === x.key ? "oneri" : ""}"><div class="lab-b"><b>${esc(x.ad)}</b>${r.oneri === x.key ? `<span class="rozet">Önerilen (uzlaşı)</span>` : ""}${x.ticari === false ? `<span class="rozet gri">Ticari değil</span>` : ""}</div></div>`);
+      if (x.hata) { k.append(h(`<div class="not">Çalışmadı: ${esc(x.hata)}</div>`)); so.append(k); return; }
+      const sr = h(`<div class="lab-resim"></div>`); x.gorseller.forEach(g => sr.append(h(`<img src="${g}" alt="${esc(x.ad)}">`))); k.append(sr);
+      k.append(h(`<div class="not">${x.sure} sn · belirsiz kenar %${x.belirsiz}</div>`));
+      const b = h(`<button class="btn kucuk">Bunu kullan</button>`);
+      b.onclick = async () => { kapat(); const q = await cagir("matte", S.cur, S.fid, {model: x.key}, true); if (q.ok) { S.st = q; ciz(); } };
+      k.append(b); so.append(k);
+    });
+    if (r.oneri) so.prepend(h(`<div class="not">Öneri, modellerin birbirine en yakın (uzlaşı) sonucuna göre verilir; mutlaka kendi gözünüzle de bakın.</div>`));
+  };
+  modal("Model Laboratuvarı", ic, true);
+}
+
 async function ayarlar(sekme = "genel") {
   S.ayar = await api.settings();
   const ic = h(`<div></div>`);
   const sek = h(`<div class="sekmeler"></div>`);
-  [["genel", "Genel"], ["yazici", "Yazıcılar"], ["yonetici", "Yönetici"], ["tasima", "Ayar taşıma"], ["kayit", "Hata kaydı"]].forEach(([k, a]) => {
+  [["genel", "Genel"], ["yazici", "Yazıcılar"], ["yonetici", "Yönetici"], ["modeller", "Modeller"], ["tasima", "Ayar taşıma"], ["kayit", "Hata kaydı"]].forEach(([k, a]) => {
     const b = h(`<button class="sekme ${k === sekme ? "secili" : ""}">${a}</button>`); b.onclick = () => ayarlar(k); sek.append(b);
   });
   ic.append(sek);
@@ -1033,6 +1075,21 @@ async function ayarlar(sekme = "genel") {
       if (r.ok) { bildir("Yönetici ayarları kaydedildi"); S.bilgi.no = String(S.ayar.arsiv_no); S.bilgi._oto = true; kapat(); panelCiz(); }
     };
     g.append(b);
+  } else if (sekme === "modeller") {
+    const ml = (await api.model_listesi()).modeller || [];
+    g.append(h(`<div class="not">Yapay zeka modelleri bu bilgisayarda çalışır, internet gerekmez. "Ek model paketi"ndeki .onnx dosyalarını <b>İçe aktar</b> ile ekleyin. Ticari olmayan lisanslı modellerin sorumluluğu kullanıcıya aittir.</div>`));
+    const t = h(`<table class="liste"><thead><tr><th>Model</th><th>Lisans</th><th>Boyut</th><th>Durum</th><th></th></tr></thead><tbody></tbody></table>`);
+    ml.forEach(x => {
+      const tr = h(`<tr><td><b>${esc(x.ad)}</b><div class="not" style="margin:0">${esc(x.not)}</div></td><td>${esc(x.lisans)}${x.ticari ? "" : ` <span class="rozet gri">Ticari değil</span>`}</td><td>${x.var ? x.mb + " MB" : "—"}</td><td>${x.var ? (x.kapali ? "Kapalı" : "Hazır") : "Yüklü değil"}</td><td style="white-space:nowrap"></td></tr>`);
+      const td = tr.lastElementChild;
+      if (x.var) { const b = h(`<button class="btn kucuk">${x.kapali ? "Aç" : "Kapat"}</button>`); b.onclick = async () => { await api.model_kapat(x.key, !x.kapali); ayarlar("modeller"); }; td.append(b); }
+      if (x.kaldirilabilir) { const b = h(`<button class="btn kucuk tehlike">Kaldır</button>`); b.onclick = async () => { await api.model_kaldir(x.key); ayarlar("modeller"); }; td.append(b); }
+      $("tbody", t).append(tr);
+    });
+    g.append(t);
+    const ib = h(`<div class="satir"><button class="btn ana">Model içe aktar (.onnx)…</button></div>`);
+    $("button", ib).onclick = async () => { const r = await cagir("model_ice_aktar"); if (r.ok) { bildir(r.eklenen?.length ? "Eklendi: " + r.eklenen.join(", ") : "Dosya eklenmedi" + (r.taninmayan?.length ? " (tanınmadı: " + r.taninmayan.join(", ") + ")" : "")); ayarlar("modeller"); } };
+    g.append(ib);
   } else if (sekme === "tasima") {
     g.append(h(`<div class="not">Profilleri, stilleri, yazıcı ve diğer ayarları tek dosyayla diğer bilgisayarlara taşıyın. Arşiv numarası taşınmaz.</div>`));
     const b = h(`<div class="satir"><button class="btn">Dışa aktar…</button><button class="btn">İçe aktar…</button></div>`);
@@ -1109,8 +1166,11 @@ function hakkinda() {
     <div style="font-weight:700;letter-spacing:.03em">HAYDAR ALTINSABAN yapımıdır · Tüm hakları saklıdır</div>
     <div class="not">HAYAL MEDYA · 0312 264 0 888 &nbsp;·&nbsp; Haydar Altınsaban · 0554 990 49 59</div></div>
     <div class="modal-ic">
-    <h3 style="margin:0;font-size:13px;color:var(--soluk);letter-spacing:.08em">SÜRÜM NOTLARI · 1.2</h3>
+    <h3 style="margin:0;font-size:13px;color:var(--soluk);letter-spacing:.08em">SÜRÜM NOTLARI · 1.3</h3>
     <ul class="not" style="margin:0;padding-left:18px;line-height:1.7;color:var(--yazi)">
+      <li><b>Yeni (1.3):</b> Model Laboratuvarı: arka plan modellerini (BiRefNet Portre/Matting/HR Matting/Genel, BEN2, isteğe bağlı RMBG-2.0 ve ViTMatte) aynı fotoğrafta beyaz, koyu ve renkli zeminde yan yana karşılaştırın; "uzlaşı" önerisi; Ayarlar → Modeller (içe aktar, kapat, kaldır, lisans etiketi).</li>
+      <li><b>Yeni (1.3):</b> Gelişmiş portre rötuşu (ten örneğine göre 3 ölçekli yumuşatma), klon damgası, keskinleştirme (Unsharp Mask), Şekillendir (it/çek, şişir, küçült, otomatik omuz hizalama; yüz kilitli).</li>
+      <li><b>Yeni (1.3):</b> HEIC, AVIF, WebP, TIFF, şeffaf PNG ve kamera RAW (NEF, DNG, CR2, ARW…) girdileri; ayar çubuklarında ◄ ► hassas ok düğmeleri; degrade renk takas düğmesi; arşiv ve raporu sıfırlama (yönetici adı + şifre, yedekli); Sorun bildir; baskı öncesi son kontrol.</li>
       <li><b>Yeni (1.2):</b> saç tipi modları (kıvırcık, dalgalı, düz, kısa, örtülü) ve saça yakınlaşma; rötuşta kirpik, kaş, bıyık, sakal, burun delikleri koruması, koruma haritası, yüzdelik “geri al” fırçası, koruma fırçası, güvenli rötuş sınırı; leke işaretlerini silme (Delete / sağ tık).</li>
       <li><b>Yeni (1.2):</b> Polaroid (Instax Square) ve Serbest Baskı modülleri aktif; toplu işlem; müşteri ayar belleği; gerçek boyutlu baskı önizlemesi; ayarlarda ekran kartı aç/kapat (yalnız işlemci modu).</li>
       <li><b>Arka plan silme:</b> BiRefNet ile saç tellerine kadar ayırma, gri hale temizliği, tıklayarak düzeltme (Segment Anything) ve fırçalar.</li>

@@ -143,6 +143,7 @@ class Api:
     def init(self):
         try:
             models.set_gpu(bool(storage.load_settings().get("gpu_kullan", True)))
+            models.set_disabled(storage.load_settings().get("model_kapali", []))
         except Exception:
             pass
         s = storage.public_settings()
@@ -217,7 +218,8 @@ class Api:
         def go():
             j = self.jobs[jid]
             if params:
-                if params.get("model") and params["model"] != j.matte_params.get("model"):
+                if (params.get("model") and params["model"] != j.matte_params.get("model")) or \
+                        ("vitmatte" in params and params["vitmatte"] != j.matte_params.get("vitmatte")):
                     force_ = True
                 else:
                     force_ = force
@@ -242,6 +244,115 @@ class Api:
             self._p(0.5, "Kenarlar güncelleniyor")
             j.rebuild_alpha()
             return self._state(j, fid)
+        return self._safe(go)
+
+    # ---------------------------------------------------------- Model Laboratuvarı / Model Yöneticisi
+    _DOSYA_ESLE = (("hr", "birefnet_hr"), ("matting", "birefnet_matting"), ("ben2", "ben2"), ("rmbg", "rmbg2"),
+                   ("vitmatte", "vitmatte"), ("general", "birefnet_general"), ("portrait", "birefnet"))
+
+    def model_listesi(self):
+        def go():
+            kapali = set(storage.load_settings().get("model_kapali", []))
+            out = []
+            for k in models.MATTE_ORDER + ["vitmatte"]:
+                m = models.MODELS[k]
+                yol = models.model_path(m["file"])
+                var = os.path.exists(yol)
+                from .paths import extra_model_dir
+                out.append({"key": k, "ad": m["ad"], "var": var, "lisans": m["lisans"], "ticari": m["ticari"],
+                            "not": m.get("not", ""), "agir": bool(m.get("agir")), "ek": bool(m.get("ek")),
+                            "mb": round(os.path.getsize(yol) / 1e6) if var else 0, "kapali": k in kapali,
+                            "kaldirilabilir": var and os.path.dirname(yol) == extra_model_dir()})
+            return {"modeller": out}
+        return self._safe(go)
+
+    def model_ice_aktar(self):
+        """Seçilen .onnx dosyalarını dosya adından tanıyıp kullanıcı klasörüne kopyalar."""
+        def go():
+            import shutil
+            from .paths import extra_model_dir
+            if not self.window:
+                return {"eklenen": []}
+            import webview
+            r = self.window.create_file_dialog(webview.OPEN_DIALOG, allow_multiple=True, file_types=("ONNX modeller (*.onnx)", "Tüm dosyalar (*.*)"))
+            eklenen, taninmayan = [], []
+            for src in (r or []):
+                low = os.path.basename(src).lower()
+                key = next((k for pat, k in self._DOSYA_ESLE if pat in low), None)
+                if key is None:
+                    taninmayan.append(os.path.basename(src)); continue
+                if "hr" in low and "matting" in low:
+                    key = "birefnet_hr"
+                shutil.copy2(src, os.path.join(extra_model_dir(), models.MODELS[key]["file"]))
+                models._SESSIONS.pop(key, None)
+                eklenen.append(models.MODELS[key]["ad"])
+            return {"eklenen": eklenen, "taninmayan": taninmayan}
+        return self._safe(go)
+
+    def model_kaldir(self, key):
+        def go():
+            from .paths import extra_model_dir
+            yol = os.path.join(extra_model_dir(), models.MODELS[key]["file"])
+            if os.path.exists(yol):
+                models._SESSIONS.pop(key, None)
+                os.remove(yol)
+            return {}
+        return self._safe(go)
+
+    def model_kapat(self, key, kapali):
+        def go():
+            s = storage.load_settings()
+            lst = set(s.get("model_kapali", []))
+            (lst.add if kapali else lst.discard)(key)
+            storage.update_settings({"model_kapali": sorted(lst)})
+            models.set_disabled(sorted(lst))
+            return {}
+        return self._safe(go)
+
+    def model_karsilastir(self, jid, fid, keys, zeminler=None):
+        """Seçilen modellerin sonucunu aynı fotoğrafta, farklı zeminlerde yan yana üretir (durum değişmez)."""
+        def go():
+            import copy
+            j = self.jobs[jid]
+            fmt = self._fmt(fid)
+            zl = list(zeminler or ["#FFFFFF", "#23272F", "#2E7D5B"])
+            sonuc, alfalar = [], {}
+            for i, k in enumerate(keys):
+                if k not in models.MODELS or not models.has_model(k):
+                    continue
+                self._p(0.1 + 0.8 * i / max(1, len(keys)), f"Karşılaştırma: {models.MODELS[k]['ad']}")
+                c = copy.copy(j)
+                c.matte_params = copy.deepcopy(j.matte_params)
+                c.matte_params["model"] = k
+                c.edits = list(j.edits)
+                c.bg = dict(j.bg)
+                c.matted = False
+                t0 = __import__("time").time()
+                try:
+                    c.matte(force=True)
+                except Exception as e:
+                    log_exc(f"karşılaştırma modeli başarısız: {k}")
+                    sonuc.append({"key": k, "ad": models.MODELS[k]["ad"], "hata": str(e)[:120]}); continue
+                sure = __import__("time").time() - t0
+                imgs = []
+                for z in zl:
+                    c.bg = {**j.bg, "tip": "solid", "renk": z}
+                    im = c.render(fmt, preview=True)
+                    h_, w_ = im.shape[:2]
+                    crop = im[: int(h_ * 0.62)]
+                    imgs.append(to_b64(crop, 360))
+                a = cv2.resize(c.A, (192, 192), interpolation=cv2.INTER_AREA)
+                alfalar[k] = a
+                belirsiz = float(((c.A > 0.1) & (c.A < 0.9)).mean() * 100)
+                sonuc.append({"key": k, "ad": models.MODELS[k]["ad"], "gorseller": imgs, "sure": round(sure, 1),
+                              "belirsiz": round(belirsiz, 2), "lisans": models.MODELS[k]["lisans"], "ticari": models.MODELS[k]["ticari"]})
+            oneri = None
+            if len(alfalar) >= 3:   # uzlaşı: diğerlerine en yakın sonuç
+                ks = list(alfalar)
+                skor = {k: float(np.mean([np.abs(alfalar[k] - alfalar[o]).mean() for o in ks if o != k])) for k in ks}
+                oneri = min(skor, key=skor.get)
+            self._p(0.98, "Karşılaştırma hazır")
+            return {"sonuclar": sonuc, "oneri": oneri, "zeminler": zl}
         return self._safe(go)
 
     SAC_MODLARI = {

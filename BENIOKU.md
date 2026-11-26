@@ -1,4 +1,4 @@
-# Hayal Medya Vesikalık Pro 1.2 — Test Sürümü 2
+# Hayal Medya Vesikalık Pro 1.3 — Test Sürümü 2
 
 HAYDAR ALTINSABAN yapımıdır · Tüm hakları saklıdır · HAYAL MEDYA 0312 264 0 888
 
@@ -20,7 +20,7 @@ HAYDAR ALTINSABAN yapımıdır · Tüm hakları saklıdır · HAYAL MEDYA 0312 2
 3. **`kurulum.bat`** dosyasına çift tıklayın. Program ekran kartını kendisi tanır (NVIDIA → CUDA, diğerleri → DirectML), paketleri ve yapay zeka modellerini (~1,6 GB) indirir. 10–30 dakika sürebilir.
 4. **`baslat.bat`** ile programı açın.
 
-**Tek dosyalık kurulum paketi (.exe):** `kurulum_paketi_olustur.bat` çalıştırın. Önce ücretsiz **Inno Setup 6** kurulu olmalı (https://jrsoftware.org/isdl.php). Sonuç: `kurulum\cikti\HayalMedya_VesikalikPro_1.2_Kurulum.exe` — masaüstü kısayollu, modeller dahil, internetsiz kurulur. Not: NVIDIA'lı bilgisayarda oluşturulan paket NVIDIA'lı bilgisayarlar içindir; 3. bilgisayar için paketi o bilgisayarda oluşturun (DirectML).
+**Tek dosyalık kurulum paketi (.exe):** `kurulum_paketi_olustur.bat` çalıştırın. Önce ücretsiz **Inno Setup 6** kurulu olmalı (https://jrsoftware.org/isdl.php). Sonuç: `kurulum\cikti\HayalMedya_VesikalikPro_1.3_Kurulum.exe` — masaüstü kısayollu, modeller dahil, internetsiz kurulur. Not: NVIDIA'lı bilgisayarda oluşturulan paket NVIDIA'lı bilgisayarlar içindir; 3. bilgisayar için paketi o bilgisayarda oluşturun (DirectML).
 
 ## İlk açılışta yapılacaklar
 1. **Ayarlar → Yazıcılar:** her yazıcı için *Sürücü ayarları* (10x15, kenarsız; Epson'da genişletme EN AZ) → *Test sayfası yazdır* → cetvelleri ölçüp yazın → *Düzelt* → tekrar test.
