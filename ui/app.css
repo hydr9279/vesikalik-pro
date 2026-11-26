@@ -304,3 +304,17 @@ kbd{display:inline-block;min-width:24px;padding:2px 7px;border-radius:6px;border
 .leke-bekleyen{position:absolute;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;border:2px dashed #F5B63F;background:rgba(245,182,63,.18);pointer-events:none}
 .manuel-buyuk{height:56px;justify-content:flex-start;gap:12px;padding:0 16px;margin:2px 0 10px}
 .model-detay{font-size:12px;color:var(--soluk);line-height:1.45;max-width:420px}.model-detay p{margin:0 0 3px}.model-detay .oner{color:var(--yazi)}.model-detay b{color:var(--yazi);font-weight:600}
+
+.mv-imlec{overflow:hidden}
+.mv-onizle{display:none;position:absolute;inset:0;width:100%;height:100%;border-radius:50%}
+.mv-hedef{display:none;position:absolute;left:50%;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px}
+.mv-hedef:before,.mv-hedef:after{content:"";position:absolute;background:#fff;box-shadow:0 0 0 1px #000}
+.mv-hedef:before{left:8px;top:0;width:2px;height:18px}.mv-hedef:after{top:8px;left:0;height:2px;width:18px}
+.mv-imlec.mv-alt-modu{border:2px solid #fff;box-shadow:0 0 0 1px #000,0 0 8px rgba(0,0,0,.6)}
+.mv-imlec.mv-alt-modu .mv-onizle,.mv-imlec.mv-alt-modu .mv-hedef{display:block}
+.mv-kaynakim{position:absolute;display:none;width:0;height:0;pointer-events:none;z-index:3}
+.mv-kaynakim i{position:absolute;left:-10px;top:-10px;width:20px;height:20px;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 1px #000,inset 0 0 0 1px #000}
+.mv-kaynakim i:before,.mv-kaynakim i:after{content:"";position:absolute;background:#000}
+.mv-kaynakim i:before{left:7px;top:-5px;width:2px;height:26px}.mv-kaynakim i:after{top:7px;left:-5px;height:2px;width:26px}
+.mv-kaynakim.vur i{animation:mvvur .5s ease-out}
+@keyframes mvvur{0%{transform:scale(2.6);opacity:.2}100%{transform:scale(1);opacity:1}}
