@@ -35,7 +35,7 @@ jobs:
           if ("${{ matrix.varyant }}" -eq "NVIDIA") { $extra += @("--collect-binaries","nvidia") }
           pyinstaller --noconfirm --clean --windowed --name VesikalikPro --icon ui/assets/app_icon.ico `
             --add-data "ui;ui" --collect-all onnxruntime --collect-all webview --collect-all pillow_heif --collect-all rawpy @extra `
-            --hidden-import win32print --hidden-import win32ui --hidden-import win32gui app.py
+            --hidden-import tkinter --hidden-import win32print --hidden-import win32ui --hidden-import win32gui app.py
           Copy-Item -Recurse -Force models dist/VesikalikPro/models
       - name: Kurulum dosyasi (Inno Setup)
         shell: pwsh

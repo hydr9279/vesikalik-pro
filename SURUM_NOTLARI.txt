@@ -2,6 +2,13 @@
 HAYDAR ALTINSABAN yapımıdır · Tüm hakları saklıdır
 HAYAL MEDYA · 0312 264 0 888 · Haydar Altınsaban · 0554 990 49 59
 
+SÜRÜM 1.4
+- Açılış: çift tıklayınca hemen "yükleniyor" animasyonlu pencere görünür; tekrar tıklamak gerekmez. Uygulama yalnız tek kez açılır (tekrar tıklanırsa açık pencere öne gelir)
+- Manuel rötuş ekranı: Klon damgası (Alt+tıkla kaynak, opaklık, sertlik, hizalı), Yama (seç ve sürükle), Nokta iyileştirme, Cilt yumuşat; yakınlaştırma, geri al/ileri al, Önce/Sonra. Her vuruş anında görünür
+- Manuel dekupe · saç ekranı: Saç fırçası, Ekle, Sil, Yumuşat, Keskinleştir, Daralt, Genişlet; beyaz/koyu/renkli/maske/kırmızı kaplama görünümleri. Bu ekranda hiçbir otomatik işlem çalışmaz
+- Arka Plan ve Rötuş araç çubukları sadeleşti: tek satır, yana kaydırılır; fareyle üzerine gelince ipucu balonu çıkar
+- Vesikalık baskıda "Sayfa kopyası" alanı kaldırıldı (adet yukarıdaki fotoğraf sayısından belirlenir); Polaroid ve Serbest Baskı'da fotoğraf başına kopya sayısı sürer
+
 SÜRÜM 1.3 (final)
 - Model Laboratuvarı: BiRefNet Portre / Matting / HR Matting / Genel, BEN2 Base, isteğe bağlı RMBG-2.0 ve ViTMatte; aynı fotoğrafta beyaz, koyu, renkli zeminde yan yana karşılaştırma ve uzlaşı önerisi
 - Ayarlar → Modeller: içe aktarma, kapatma, kaldırma, lisans / "Ticari değil" etiketi (ek modeller ayrı paketten)

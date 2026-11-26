@@ -372,7 +372,7 @@ function rotusTuval(sh, alan, ic, kat, norm, ana) {
   const A = S.rArac || "k";
   const T = (k, ad, ip) => `<button class="arac ${A === k ? "secili" : ""}" data-a="${k}" title="${ip}">${ad}</button>`;
   const fs = S.st.firca_sayisi || [0, 0];
-  const ar = h(`<div class="araclar">${T("k", "Karşılaştır", "Önce / sonra sürgüsü")}${T("l", "Leke fırçası", "Tıklanan yeri leke olarak temizler (L)")}${T("g", "Geri al fırçası", "Rötuşu fırçayla yüzdelik olarak siler, orijinale döndürür (G)")}${T("p", "Koruma fırçası", "Fırçayla boyanan yer rötuştan korunur (P)")}${T("n", "Klon damgası", "Alt + tıkla: kaynak seç, sonra boyayarak kopyala (S)")}${T("t", "Ten örneği", "Gelişmiş portre rötuşu için ten rengi örneği seç (T)")}<span class="arac-ayrac"></span>${T("m", "İt / çek", "Omuz ve giysi kenarını fırçayla it (M). Yüz kilitlidir")}${T("b", "Şişir", "Fırçanın altını büyüt (B). Yüz kilitlidir")}${T("z", "Küçült", "Fırçanın altını küçült (Z). Yüz kilitlidir")}<span class="arac-ayrac"></span><button class="arac ${S.lekeGoster ? "secili" : ""}" data-a="x" title="Bulunan lekeleri göster/gizle">Lekeleri göster</button><button class="arac ${S.rGor === "koruma" ? "secili" : ""}" data-a="v" title="Rötuşun dokunmadığı bölgeleri yeşil gösterir (K)">Koruma haritası</button><button class="arac" data-a="u" title="Son fırça darbesini geri al">↶ Fırça geri al</button><button class="arac" data-a="us" title="Son şekillendirme darbesini geri al">↶ Şekil geri al${S.st.sekil_sayisi ? " (" + S.st.sekil_sayisi + ")" : ""}</button><button class="arac" data-a="uk" title="Son klon darbesini geri al">↶ Klon geri al${S.st.klon_sayisi ? " (" + S.st.klon_sayisi + ")" : ""}</button></div>`);
+  const ar = h(`<div class="araclar">${T("k", "Karşılaştır", "Önce / sonra sürgüsü: fotoğrafın önceki ve sonraki hâlini yan yana kaydırarak görün")}<span class="arac-ayrac"></span>${T("l", "Leke fırçası", "Tıklanan yeri leke olarak temizler (L)")}${T("g", "Geri al fırçası", "Rötuşu fırçayla yüzdelik olarak siler, orijinale döndürür (G)")}${T("p", "Koruma fırçası", "Fırçayla boyanan yer rötuştan korunur (P)")}<span class="arac-ayrac"></span>${T("n", "Klon damgası", "Alt + tıkla: kaynak seç, sonra boyayarak kopyala (S)")}${T("t", "Ten örneği", "Gelişmiş portre rötuşu için ten rengi örneği seç (T)")}<span class="arac-ayrac"></span>${T("m", "İt / çek", "Omuz ve giysi kenarını fırçayla it (M). Yüz kilitlidir")}${T("b", "Şişir", "Fırçanın altını büyüt (B). Yüz kilitlidir")}${T("z", "Küçült", "Fırçanın altını küçült (Z). Yüz kilitlidir")}<span class="arac-ayrac"></span><button class="arac ${S.lekeGoster ? "secili" : ""}" data-a="x" title="Bulunan lekeleri göster/gizle">Lekeleri göster</button><button class="arac ${S.rGor === "koruma" ? "secili" : ""}" data-a="v" title="Rötuşun dokunmadığı bölgeleri yeşil gösterir (K)">Koruma haritası</button><button class="arac" data-a="u" title="Son fırça darbesini geri al">↶ Fırça geri al</button><button class="arac" data-a="us" title="Son şekillendirme darbesini geri al">↶ Şekil geri al${S.st.sekil_sayisi ? " (" + S.st.sekil_sayisi + ")" : ""}</button><button class="arac" data-a="uk" title="Son klon darbesini geri al">↶ Klon geri al${S.st.klon_sayisi ? " (" + S.st.klon_sayisi + ")" : ""}</button></div>`);
   $$(".arac", ar).forEach(b => b.onclick = async () => {
     const a = b.dataset.a;
     if (a === "x") S.lekeGoster = !S.lekeGoster;
@@ -673,7 +673,9 @@ function panelArkaplan(p) {
   b1.append(sel);
   const lab = h(`<button class="btn kucuk genis ana">Model Laboratuvarı · modelleri karşılaştır…</button>`);
   lab.onclick = modelLab;
-  b1.append(lab);
+  const mdk = h(`<button class="btn kucuk genis" title="Saç ve kenarı fırçayla elle düzeltin: her dokunuş anında görünür, otomatik işlem yoktur">✎ Manuel dekupe · saç düzenle${st.manuel_var && st.manuel_var[1] ? " ●" : ""}</button>`);
+  mdk.onclick = () => manuelAc("dekupe");
+  b1.append(lab, mdk);
   if ((S.modeller || []).some(x => x.key === "vitmatte" && x.var && !x.kapali))
     b1.append(secim("vm", "ViTMatte ile kenar rafine et (ticari değil)", !!m.vitmatte, async v => { const r = await cagir("matte", S.cur, S.fid, {vitmatte: v}, true); if (r.ok) { S.st = r; ciz(); } }, "Saç kenarındaki belirsiz bandı ince ayarlar; yavaştır"));
   b1.append(h(`<div class="not">Kullanılan: <b>${esc(((S.modeller || []).find(x => x.key === st.model) || {}).ad || st.model)}</b> · ${esc(st.donanim)}</div>`));
@@ -770,6 +772,9 @@ function panelRotus(p) {
     const x = await rotusUygula(v); if (x.ok) { sahneCiz(); panelCiz(); }
   };
   pr.append(sel);
+  const mrt = h(`<button class="btn kucuk genis ana" title="Photoshop benzeri klon damgası, yama ve nokta iyileştirme: her vuruş anında etki eder">✎ Manuel rötuş ekranı${S.st.manuel_var && S.st.manuel_var[0] ? " ●" : ""}</button>`);
+  mrt.onclick = () => manuelAc("rotus");
+  pr.append(mrt);
   const pb = h(`<div class="satir"><button class="btn kucuk genis">Profili kaydet</button></div>`);
   $("button", pb).onclick = () => metinSor("Profil adı", "", async (ad) => { if (!ad) return; profiller[ad] = {...r}; S.ayar.rotus_profilleri = profiller; await api.update_settings({rotus_profilleri: profiller}); bildir("Profil kaydedildi"); panelCiz(); });
   pr.append(pb);
@@ -891,7 +896,6 @@ function panelBaski(p) {
   (S.init.yazicilar || []).forEach(n => ys.append(h(`<option ${n === S.ayar.varsayilan_yazici ? "selected" : ""}>${esc(n)}</option>`)));
   if (!(S.init.yazicilar || []).length) ys.append(h(`<option value="">Yazıcı bulunamadı</option>`));
   y.append(ys);
-  y.append(h(`<div class="satir"><label class="not" for="sKop">Sayfa kopyası</label><input type="number" id="sKop" min="1" max="20" value="1" style="width:80px"></div>`));
   p.append(y);
   const btn = bolum("ONAY");
   const b1 = h(`<button class="btn ana">Kaydet ve Yazdır</button>`), b2 = h(`<button class="btn">Sadece Kaydet</button>`);
@@ -901,11 +905,11 @@ function panelBaski(p) {
   p.append(btn);
 }
 function sonKontrol(onay) {
-  const ad = $("#sAd")?.value.trim(), yz = $("#sYz")?.value, kop = +($("#sKop")?.value || 1);
+  const ad = $("#sAd")?.value.trim(), yz = $("#sYz")?.value, sayfa = (+S.bilgi.adet || 4) / 4;
   const uyg = (S.st?.uygunluk || []).filter(c => c.durum !== "ok");
   const sat = [
     [!!ad, "Müşteri adı", ad || "Girilmemiş (dosya adında boş kalır)"],
-    [true, "Adet", `${S.bilgi.adet} fotoğraf · ${kop} kopya`],
+    [true, "Adet", `${S.bilgi.adet} fotoğraf · ${sayfa} sayfa baskı`],
     [!!yz, "Yazıcı", yz || "Seçilmemiş"],
     [!uyg.length, "Uygunluk", uyg.length ? uyg.map(c => c.ad).join(", ") : "Tüm kurallar uygun"],
   ];
@@ -925,7 +929,7 @@ async function kaydet(yazdir, kontrolsuz = false) {
   if (yazdir && !kontrolsuz && S.ayar.son_kontrol !== false) { sonKontrol(() => kaydet(yazdir, true)); return; }
   S.bilgi.no = $("#sNo").value.trim(); S.bilgi.musteri = $("#sAd").value.trim(); S.kayitKlasor = klasor;
   const r = await cagir("save", S.cur, S.fid, {klasor, no: S.bilgi.no, adet: S.bilgi.adet, musteri: S.bilgi.musteri, tekli: S.ayar.tekli_jpg !== false,
-    online: !!S.online, yazdir, yazici: $("#sYz")?.value, kopya: +($("#sKop")?.value || 1)});
+    online: !!S.online, yazdir, yazici: $("#sYz")?.value, kopya: 1});
   if (!r.ok) return;
   const j = isBul(S.cur); j.kaydedildi = true; j.not = "Kaydedildi" + (r.yazdirildi ? " · basıldı" : ""); j.durum = "iyi";
   S.bilgi.no = String(r.sonraki_no); S.bilgi._oto = true;
@@ -1166,8 +1170,11 @@ function hakkinda() {
     <div style="font-weight:700;letter-spacing:.03em">HAYDAR ALTINSABAN yapımıdır · Tüm hakları saklıdır</div>
     <div class="not">HAYAL MEDYA · 0312 264 0 888 &nbsp;·&nbsp; Haydar Altınsaban · 0554 990 49 59</div></div>
     <div class="modal-ic">
-    <h3 style="margin:0;font-size:13px;color:var(--soluk);letter-spacing:.08em">SÜRÜM NOTLARI · 1.3</h3>
+    <h3 style="margin:0;font-size:13px;color:var(--soluk);letter-spacing:.08em">SÜRÜM NOTLARI · 1.4</h3>
     <ul class="not" style="margin:0;padding-left:18px;line-height:1.7;color:var(--yazi)">
+      <li><b>Yeni (1.4):</b> Açılış animasyonu ve tek pencere kilidi: çift tıklayınca hemen yükleniyor penceresi görünür, tekrar tıklamak gerekmez, uygulama bir kez açılır.</li>
+      <li><b>Yeni (1.4):</b> Manuel rötuş ekranı (klon damgası, yama, nokta iyileştirme, cilt yumuşatma) ve manuel dekupe · saç ekranı (saç fırçası, ekle, sil, yumuşat, keskinleştir, daralt, genişlet). Her vuruş anında görünür.</li>
+      <li><b>Yeni (1.4):</b> Sade, yana kaydırılabilir araç çubukları ve fareyle ipucu balonları; vesikalık baskıda "Sayfa kopyası" kaldırıldı.</li>
       <li><b>Yeni (1.3):</b> Model Laboratuvarı: arka plan modellerini (BiRefNet Portre/Matting/HR Matting/Genel, BEN2, isteğe bağlı RMBG-2.0 ve ViTMatte) aynı fotoğrafta beyaz, koyu ve renkli zeminde yan yana karşılaştırın; "uzlaşı" önerisi; Ayarlar → Modeller (içe aktar, kapat, kaldır, lisans etiketi).</li>
       <li><b>Yeni (1.3):</b> Gelişmiş portre rötuşu (ten örneğine göre 3 ölçekli yumuşatma), klon damgası, keskinleştirme (Unsharp Mask), Şekillendir (it/çek, şişir, küçült, otomatik omuz hizalama; yüz kilitli).</li>
       <li><b>Yeni (1.3):</b> HEIC, AVIF, WebP, TIFF, şeffaf PNG ve kamera RAW (NEF, DNG, CR2, ARW…) girdileri; ayar çubuklarında ◄ ► hassas ok düğmeleri; degrade renk takas düğmesi; arşiv ve raporu sıfırlama (yönetici adı + şifre, yedekli); Sorun bildir; baskı öncesi son kontrol.</li>
@@ -1287,3 +1294,31 @@ document.addEventListener("keydown", (e) => {
   if (S.adim === 4 && e.ctrlKey && k.toLowerCase() === "p") { e.preventDefault(); kaydet(true); }
 });
 document.addEventListener("keyup", (e) => { if (e.code === "Space") bosluk = false; });
+
+
+// ------------------------------------------------------------------ ipucu balonu (tüm düğmelerde) ve araç çubuğu kaydırma
+(function () {
+  const ip = document.createElement("div"); ip.className = "ipucu"; document.body.appendChild(ip);
+  let t = null, hedef = null;
+  const gizle = () => { clearTimeout(t); hedef = null; ip.classList.remove("acik"); };
+  document.addEventListener("mouseover", (e) => {
+    const el = e.target.closest && e.target.closest("[title],[data-ip]");
+    if (!el || el === hedef) return;
+    if (el.hasAttribute("title")) { el.dataset.ip = el.getAttribute("title"); el.removeAttribute("title"); }
+    if (!el.dataset.ip) return;
+    gizle(); hedef = el;
+    t = setTimeout(() => {
+      ip.textContent = el.dataset.ip; ip.classList.add("acik");
+      const r = el.getBoundingClientRect(), w = ip.offsetWidth, h = ip.offsetHeight;
+      let x = Math.min(window.innerWidth - w - 8, Math.max(8, r.left + r.width / 2 - w / 2));
+      let y = r.bottom + 10; if (y + h > window.innerHeight - 8) y = r.top - h - 10;
+      ip.style.left = x + "px"; ip.style.top = y + "px";
+    }, 280);
+  });
+  document.addEventListener("mouseout", (e) => { if (hedef && !(e.relatedTarget && hedef.contains(e.relatedTarget))) gizle(); });
+  document.addEventListener("mousedown", gizle, true);
+  document.addEventListener("wheel", (e) => {
+    const bar = e.target.closest && e.target.closest(".araclar");
+    if (bar && bar.scrollWidth > bar.clientWidth && Math.abs(e.deltaY) > Math.abs(e.deltaX)) { bar.scrollLeft += e.deltaY; e.preventDefault(); e.stopPropagation(); }
+  }, {passive: false, capture: true});
+})();

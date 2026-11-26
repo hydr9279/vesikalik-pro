@@ -57,6 +57,10 @@ class Job:
         self.matted = False
         self.A = None
         self.Wr = None
+        self.manuel_rgb = None       # Manuel rötuş yaması (H,W,3) ve değişen piksel maskesi
+        self.manuel_m = None
+        self.manuel_A = None         # Manuel dekupe/saç maskesi (H,W float) ve değişen piksel maskesi
+        self.manuel_Am = None
         self.shape_ops = []          # Şekillendir fırça işlemleri
         self.omuz = 0.0              # uygulanan omuz düzeltmesi (0 = kapalı, 1 = tam düzeltme)
         self._shape_key = None
@@ -338,7 +342,10 @@ class Job:
             A = cv2.erode(A, np.ones((k, k), np.uint8))
         if p["yumusaklik"] > 0:
             A = cv2.GaussianBlur(A, (0, 0), 0.3 + p["yumusaklik"] / 100.0 * 2.0)
-        self.A = np.clip(A, 0, 1).astype(np.float32)
+        A = np.clip(A, 0, 1).astype(np.float32)
+        if self.manuel_A is not None and self.manuel_Am is not None and self.manuel_A.shape == A.shape:
+            A = np.where(self.manuel_Am, self.manuel_A, A)   # manuel dekupe/saç düzeltmesi
+        self.A = A
         self._fg_cache = None
         self._crown()
 
@@ -616,6 +623,8 @@ class Job:
         ks = {**DEFAULT_KESKIN, **(p.get("keskin") or {})}
         if ks.get("miktar", 0) > 0:
             out = unsharp(out, ks, iod, skin_soft)
+        if self.manuel_rgb is not None and self.manuel_m is not None and self.manuel_rgb.shape == out.shape:
+            out = np.where(self.manuel_m[..., None], self.manuel_rgb, out)   # manuel rötuş yaması (son katman)
         self.Wr = out
         self._retouch_key = key
         self._fg_cache = None

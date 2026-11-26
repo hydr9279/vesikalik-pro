@@ -98,7 +98,8 @@ class Api:
         out["donanim"] = models.provider_info()["name"]
         out["model"] = getattr(j, "matte_model", "")
         out["matte"] = {k: v for k, v in j.matte_params.items()}
-        out["rotus"] = {k: v for k, v in j.retouch_params.items() if k not in ("spots", "geri_al", "fircalar", "koruma_fircalar", "klon")}
+        out["rotus"] = {k: v for k, v in j.retouch_params.items() if k not in ("spots", "geri_al", "fircalar", "koruma_fircalar", "klon", "manuel")}
+        out["manuel_var"] = [j.manuel_m is not None, j.manuel_Am is not None]
         out["klon_sayisi"] = len(j.retouch_params.get("klon") or [])
         out["sekil_sayisi"] = len(j.shape_ops)
         out["omuz"] = j.omuz
@@ -243,6 +244,88 @@ class Api:
             j.matte_params.update(params)
             self._p(0.5, "Kenarlar güncelleniyor")
             j.rebuild_alpha()
+            return self._state(j, fid)
+        return self._safe(go)
+
+    # ---------------------------------------------------------- Manuel düzenleme ekranları
+    def manuel_ac(self, jid, fid, mod):
+        """Manuel ekran için veri: tek seferde yüklenir, sonrası istemci tarafında anlık çalışır."""
+        def go():
+            j = self.jobs[jid]
+            if mod == "rotus":
+                if j.Wr is None:
+                    j.retouch(self._p)
+                ok, buf = cv2.imencode(".jpg", j.Wr, [cv2.IMWRITE_JPEG_QUALITY, 93])
+                h_, w_ = j.Wr.shape[:2]
+                return {"w": w_, "h": h_, "gorsel": "data:image/jpeg;base64," + base64.b64encode(buf.tobytes()).decode()}
+            # dekupe / saç
+            if not j.matted:
+                j.matte(self._p)
+            ok, buf = cv2.imencode(".jpg", j.W, [cv2.IMWRITE_JPEG_QUALITY, 93])
+            h_, w_ = j.W.shape[:2]
+            def small(img):
+                sm = cv2.resize((np.clip(img, 0, 1) * 255).astype(np.uint8), (max(8, w_ // 8), max(8, h_ // 8)), interpolation=cv2.INTER_AREA)
+                ok2, b2 = cv2.imencode(".png", sm)
+                return "data:image/png;base64," + base64.b64encode(b2.tobytes()).decode()
+            from .imgutil import png_b64
+            return {"w": w_, "h": h_, "gorsel": "data:image/jpeg;base64," + base64.b64encode(buf.tobytes()).decode(),
+                    "alfa": png_b64((j.A * 255).astype(np.uint8)),
+                    "plaka_b": small(j.Bplate[..., ::-1] if False else j.Bplate), "plaka_f": small(j.Fplate)}
+        return self._safe(go)
+
+    @staticmethod
+    def _png_oku(data_url):
+        raw = base64.b64decode(data_url.split(",", 1)[1])
+        return cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_UNCHANGED)
+
+    def manuel_uygula_rotus(self, jid, fid, x, y, png):
+        """Değişen bölgenin RGBA yaması (alfa>0 = değişen piksel) çalışma görüntüsü koordinatında uygulanır."""
+        def go():
+            j = self.jobs[jid]
+            im = self._png_oku(png)          # BGRA
+            if im is None or im.ndim != 3 or im.shape[2] != 4:
+                raise ValueError("Yama okunamadı")
+            H, W = j.W.shape[:2]
+            if j.manuel_rgb is None or j.manuel_rgb.shape[:2] != (H, W):
+                j.manuel_rgb = np.zeros((H, W, 3), np.uint8)
+                j.manuel_m = np.zeros((H, W), bool)
+            x0, y0, h_, w_ = int(x), int(y), im.shape[0], im.shape[1]
+            x1, y1 = min(W, x0 + w_), min(H, y0 + h_)
+            sub = im[: y1 - y0, : x1 - x0]
+            m = sub[..., 3] > 0
+            j.manuel_rgb[y0:y1, x0:x1][m] = sub[..., :3][m]
+            j.manuel_m[y0:y1, x0:x1] |= m
+            j.retouch_params["manuel"] = int(j.retouch_params.get("manuel", 0)) + 1
+            j.retouch(self._p)
+            return self._state(j, fid)
+        return self._safe(go)
+
+    def manuel_uygula_dekupe(self, jid, fid, alfa_png, maske_png):
+        """Manuel maske: alfa (gri PNG, çalışma boyutu) + değişen piksellerin maskesi."""
+        def go():
+            j = self.jobs[jid]
+            a = self._png_oku(alfa_png)
+            m = self._png_oku(maske_png)
+            if a.ndim == 3: a = a[..., 0]
+            if m.ndim == 3: m = m[..., 0]
+            if a.shape != j.A.shape:
+                raise ValueError("Maske boyutu uyuşmuyor")
+            j.manuel_A = a.astype(np.float32) / 255.0
+            j.manuel_Am = m > 127
+            j.rebuild_alpha()
+            return self._state(j, fid)
+        return self._safe(go)
+
+    def manuel_sifirla(self, jid, fid, mod):
+        def go():
+            j = self.jobs[jid]
+            if mod == "rotus":
+                j.manuel_rgb = j.manuel_m = None
+                j.retouch_params["manuel"] = int(j.retouch_params.get("manuel", 0)) + 1
+                j.retouch(self._p)
+            else:
+                j.manuel_A = j.manuel_Am = None
+                j.rebuild_alpha()
             return self._state(j, fid)
         return self._safe(go)
 
@@ -418,7 +501,7 @@ class Api:
         def go():
             j = self.jobs[jid]
             p = dict(params)
-            for k in ("spots", "geri_al", "fircalar", "koruma_fircalar", "klon", "pro_ornekler"):
+            for k in ("spots", "geri_al", "fircalar", "koruma_fircalar", "klon", "pro_ornekler", "manuel"):
                 p.pop(k, None)
             if "pro" in p:   # örnek noktaları motorda tutulur; arayüz yalnız ayarları gönderir
                 p["pro"] = {**(p["pro"] or {}), "ornekler": (j.retouch_params.get("pro") or {}).get("ornekler", [])}
@@ -632,7 +715,7 @@ class Api:
                 pr = opts.get("yazici") or storage.load_settings().get("varsayilan_yazici")
                 prof = storage.load_settings().get("yazicilar", {}).get(pr) or printing.default_profile(pr)
                 sheets = max(1, adet // 4) if fmt["dizim"] != "ortali" else 1
-                printing.print_image(sh, pr, prof, copies=sheets * int(opts.get("kopya", 1)))
+                printing.print_image(sh, pr, prof, copies=sheets)
                 printed = True
             storage.add_record({"no": no, "musteri": opts.get("musteri", ""), "tur": fmt["ad"], "fid": fid, "adet": adet,
                                 "dosyalar": paths, "klasor": folder, "yazdirildi": printed, "kaynak": j.path,
