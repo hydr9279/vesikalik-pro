@@ -1254,8 +1254,9 @@ function hakkinda() {
     <div style="font-weight:700;letter-spacing:.03em">HAYDAR ALTINSABAN yapımıdır · Tüm hakları saklıdır</div>
     <div class="not">HAYAL MEDYA · 0312 264 0 888 &nbsp;·&nbsp; Haydar Altınsaban · 0554 990 49 59</div></div>
     <div class="modal-ic">
-    <h3 style="margin:0;font-size:13px;color:var(--soluk);letter-spacing:.08em">SÜRÜM NOTLARI · 1.4.4</h3>
+    <h3 style="margin:0;font-size:13px;color:var(--soluk);letter-spacing:.08em">SÜRÜM NOTLARI · 1.4.5</h3>
     <ul class="not" style="margin:0;padding-left:18px;line-height:1.7;color:var(--yazi)">
+      <li><b>Yeni (1.4.5):</b> Çubuklar sürüklenirken canlı etki eder (ölçekleme, fon, ışık/renk, omuz, Polaroid/Serbest); İt/çek, Şişir, Küçült fırçaları sürüklerken sonucu canlı gösterir; klon damgasında Alt basılıyken örnek alınacak bölge imleçte görünür; ticari olmayan modeller kapalı başlar; Polaroid dolgusu yumuşatıldı.</li>
       <li><b>Düzeltme (1.4.4):</b> İlk açılışta "yanıt vermiyor" sorunu için kalıcı pencere profili; yükleme ekranı arayüz yüklenene kadar açık kalır.</li>
       <li><b>Yeni (1.4.3):</b> Her ekranda Ana menü düğmesi; Polaroid ve Serbest Baskı'da fotoğrafa çift tıklayınca tam sayfa düzenleme (kaydır, yakınlaştır, renk, sıfırla).</li>
       <li><b>Yeni (1.4.3):</b> Leke fırçası toplu "Uygula"; Geri al fırçası opaklıklı ve en son katmanda; rötuş araçları sol sütunda; kayıt klasörü sorulur; modeller için ayrıntılı açıklamalar; ölçekleme sürükleme hatası giderildi.</li>

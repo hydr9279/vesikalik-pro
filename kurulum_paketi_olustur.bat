@@ -18,5 +18,5 @@ if not exist %ISCC% (
 )
 %ISCC% kurulum\vesikalik_pro.iss
 echo.
-echo Tamam: kurulum\cikti\HayalMedya_VesikalikPro_1.4.4_Kurulum.exe
+echo Tamam: kurulum\cikti\HayalMedya_VesikalikPro_1.4.5_Kurulum.exe
 pause
