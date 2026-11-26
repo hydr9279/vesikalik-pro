@@ -141,6 +141,18 @@ class Api:
         return out
 
     # ---------------------------------------------------------- başlangıç
+    @staticmethod
+    def _yazicilar():
+        """Ağ yazıcısı yanıt vermese bile açılış en çok 3 sn beklesin."""
+        out = {"v": []}
+        def go():
+            try:
+                out["v"] = printing.list_printers()
+            except Exception:
+                pass
+        t = threading.Thread(target=go, daemon=True); t.start(); t.join(3.0)
+        return out["v"]
+
     def init(self):
         try:
             models.set_gpu(bool(storage.load_settings().get("gpu_kullan", True)))
@@ -149,7 +161,7 @@ class Api:
             pass
         s = storage.public_settings()
         return {"surum": VERSION, "ad": APP_NAME, "formatlar": public_formats(), "degradeler": GRADIENTS,
-                "ayarlar": s, "stiller": list_styles(), "yazicilar": printing.list_printers(),
+                "ayarlar": s, "stiller": list_styles(), "yazicilar": self._yazicilar(),
                 "varsayilanlar": {"rotus": DEFAULT_RETOUCH, "matte": DEFAULT_MATTE, "bg": DEFAULT_BG, "geom": DEFAULT_GEOM},
                 "modeller": {k: models.has_model(k) for k in models.MODELS}, "windows": printing.WIN}
 

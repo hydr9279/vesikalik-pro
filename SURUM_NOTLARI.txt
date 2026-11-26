@@ -2,6 +2,9 @@
 HAYDAR ALTINSABAN yapımıdır · Tüm hakları saklıdır
 HAYAL MEDYA · 0312 264 0 888 · Haydar Altınsaban · 0554 990 49 59
 
+SÜRÜM 1.4.1
+- Açılışta "yanıt vermiyor" sorunu giderildi: yükleme ekranı artık ayrı işlemde çalışır; yazıcı listesi en çok 3 sn beklenir
+
 SÜRÜM 1.4
 - Açılış: çift tıklayınca hemen "yükleniyor" animasyonlu pencere görünür; tekrar tıklamak gerekmez. Uygulama yalnız tek kez açılır (tekrar tıklanırsa açık pencere öne gelir)
 - Manuel rötuş ekranı: Klon damgası (Alt+tıkla kaynak, opaklık, sertlik, hizalı), Yama (seç ve sürükle), Nokta iyileştirme, Cilt yumuşat; yakınlaştırma, geri al/ileri al, Önce/Sonra. Her vuruş anında görünür
