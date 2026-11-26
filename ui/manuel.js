@@ -18,7 +18,7 @@ async function manuelAc(mod) {
   const img = await mvResim(r.gorsel);
   const W = r.w, H = r.h;
   const M = MV.m = {mod, W, H, zoom: 1, tx: 0, ty: 0, arac: mod === "rotus" ? "klon" : "sac", boyut: Math.max(20, Math.round(W / 60)),
-    sert: 50, guc: mod === "rotus" ? 100 : 60, doku: 35, hizali: true, kaynak: null, ofs: null, gecmis: [], ileri: [], onceMi: false,
+    sert: 50, guc: mod === "rotus" ? 100 : 60, doku: 35, hizali: true, akis: 100, yMod: "kaynak", yay: 3, kaynak: null, ofs: null, gecmis: [], ileri: [], onceMi: false,
     gorunum: "beyaz", tasma: 80, bosluk: false, sel: null, kirli: false};
   MV.acik = true;
 
@@ -134,7 +134,7 @@ async function manuelAc(mod) {
     const ox = M.ofs[0], oy = M.ofs[1];
     for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
       const a = fircaA(Math.hypot(x - px, y - py), r, M.sert); if (a <= 0) continue;
-      const i = y * W + x; if (a > cov[i]) cov[i] = a;
+      const i = y * W + x; cov[i] += (1 - cov[i]) * a * (M.akis / 100);
       const sx = Math.round(x + ox), sy = Math.round(y + oy); if (sx < 0 || sy < 0 || sx >= W || sy >= H) continue;
       const e = cov[i] * op, p = i * 4, q = (sy * W + sx) * 4;
       d[p] = s[p] * (1 - e) + s[q] * e; d[p + 1] = s[p + 1] * (1 - e) + s[q + 1] * e; d[p + 2] = s[p + 2] * (1 - e) + s[q + 2] * e;
@@ -188,17 +188,22 @@ async function manuelAc(mod) {
     const yol = lasso || (M.sel && M.sel.pts);
     if (!yol || yol.length < 2) return;
     const dx = yama ? yama.dx : 0, dy = yama ? yama.dy : 0;
-    const pts = yol.map(([x, y]) => `${M.tx + (x + dx * 0) * M.zoom},${M.ty + (y + dy * 0) * M.zoom}`).join(" ");
-    selSvg.innerHTML = `<polygon points="${pts}" fill="rgba(245,182,63,.12)" stroke="#F5B63F" stroke-width="1.5" stroke-dasharray="6 4"/>` +
-      (yama ? `<polygon points="${yol.map(([x, y]) => `${M.tx + (x + yama.dx) * M.zoom},${M.ty + (y + yama.dy) * M.zoom}`).join(" ")}" fill="none" stroke="#7FC8FF" stroke-width="1.5" stroke-dasharray="3 3"/>` : "");
+    const pts = yol.map(([x, y]) => `${(M.tx + (x + dx) * M.zoom).toFixed(1)},${(M.ty + (y + dy) * M.zoom).toFixed(1)}`).join(" ");
+    if (lasso) {   // çizerken: ince koyu serbest çizgi (Photoshop'taki gibi)
+      selSvg.innerHTML = `<polyline points="${pts}" fill="none" stroke="#fff" stroke-width="3" stroke-opacity=".55" stroke-linejoin="round"/><polyline points="${pts}" fill="none" stroke="#111" stroke-width="1.2" stroke-linejoin="round"/>`;
+    } else {       // seçili: yürüyen karıncalar (siyah-beyaz kesik çizgi)
+      selSvg.innerHTML = `<polygon points="${pts}" fill="rgba(0,0,0,.06)" stroke="#fff" stroke-width="1.3"/><polygon points="${pts}" fill="none" stroke="#111" stroke-width="1.3" stroke-dasharray="5 5" class="mv-karinca"/>`;
+    }
   };
-  const yamaUygula = (pts, dx, dy, kalici) => {
+  const yamaUygula = (pts0, dx0, dy0) => {
+    const hedefMod = M.yMod === "hedef";
+    const pts = hedefMod ? pts0.map(([x, y]) => [x + dx0, y + dy0]) : pts0, dx = hedefMod ? -dx0 : dx0, dy = hedefMod ? -dy0 : dy0;
     let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1; pts.forEach(([x, y]) => { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); });
     const pad = 8; x0 = Math.max(0, Math.floor(x0 - pad)); y0 = Math.max(0, Math.floor(y0 - pad)); x1 = Math.min(W, Math.ceil(x1 + pad)); y1 = Math.min(H, Math.ceil(y1 + pad));
     const w = x1 - x0, hh = y1 - y0; if (w < 2 || hh < 2) return;
     // seçim maskesi (kenar yumuşatmalı)
     const mc = document.createElement("canvas"); mc.width = w; mc.height = hh; const mx = mc.getContext("2d", {willReadFrequently: true});
-    mx.filter = "blur(2px)"; mx.fillStyle = "#fff"; mx.beginPath(); pts.forEach(([x, y], i) => i ? mx.lineTo(x - x0, y - y0) : mx.moveTo(x - x0, y - y0)); mx.closePath(); mx.fill();
+    mx.filter = `blur(${(0.6 + M.yay * 1.1).toFixed(1)}px)`; mx.fillStyle = "#fff"; mx.beginPath(); pts.forEach(([x, y], i) => i ? mx.lineTo(x - x0, y - y0) : mx.moveTo(x - x0, y - y0)); mx.closePath(); mx.fill();
     const md = mx.getImageData(0, 0, w, hh).data;
     // hedef ve kaynak bölgesi, alçak geçiren farkı (ışık/renk uyumu)
     const bolge = (sx, sy) => { const c = document.createElement("canvas"); c.width = w; c.height = hh; const x = c.getContext("2d", {willReadFrequently: true}); x.putImageData(new ImageData(new Uint8ClampedArray(orig.data.length ? subBolge(snap, sx, sy, w, hh) : 0), w, hh), 0, 0); return c; };
@@ -290,25 +295,55 @@ async function manuelAc(mod) {
   });
   const birak = (e) => {
     tut = null;
-    if (lasso) { if (lasso.length > 3) M.sel = {pts: lasso}; lasso = null; selCiz(); durumIpucu(M.sel ? "Seçimin içinden tutup temiz bir alana sürükleyin, bırakınca uygulanır" : ""); return; }
+    if (lasso) { if (lasso.length > 3) M.sel = {pts: lasso}; lasso = null; selCiz(); durumIpucu(M.sel ? "Seçimin içinden tutup temiz bir alana sürükleyin, bırakınca uygulanır · Esc: seçimi kaldır" : ""); return; }
     if (yama) { const fark = Math.hypot(yama.dx, yama.dy); const pts = M.sel.pts; yama = null; if (fark < 2) { for (let i = 0; i < wd.data.length; i++) wd.data[i] = snap[i]; snap = null; goster(0, 0, W, H); } else { M.sel = null; darbeBitir(); } selCiz(); return; }
     if (cizim) { cizim = false; son = null; darbeBitir(); }
   };
   alan.addEventListener("pointerup", birak); alan.addEventListener("pointercancel", birak);
   alan.addEventListener("pointerleave", () => { imlec.style.display = "none"; });
-  alan.addEventListener("contextmenu", (e) => e.preventDefault());
+  const FIRCALI = ["klon", "yumusat", "nokta", "sac", "ekle", "sil", "keskin", "daralt", "genislet"];
+  let popup = null;
+  const popupKapat = () => { if (popup) { popup.remove(); popup = null; document.removeEventListener("pointerdown", disTik, true); } };
+  const disTik = (e) => { if (popup && !popup.contains(e.target)) popupKapat(); };
+  const fircaPopup = (cx_, cy_) => {
+    popupKapat();
+    const mx_ = Math.round(W / 6);
+    popup = h(`<div class="mv-pop"><div class="mv-pop-onizle"><canvas width="96" height="96"></canvas></div>
+      <label><span>Boyut</span><input type="range" min="1" max="${mx_}" value="${M.boyut}"><input type="number" min="1" max="${mx_}" value="${M.boyut}" class="sayi"><i>px</i></label>
+      <label><span>Sertlik</span><input type="range" min="0" max="100" value="${M.sert}"><input type="number" min="0" max="100" value="${M.sert}" class="sayi"><i>%</i></label></div>`);
+    kok.appendChild(popup);
+    const ar = kok.getBoundingClientRect(), pw = 270, ph = 190;
+    popup.style.left = mvKelep(cx_ - ar.left - pw / 2, 8, ar.width - pw - 8) + "px"; popup.style.top = mvKelep(cy_ - ar.top + 14, 8, ar.height - ph - 8) + "px";
+    const pc = $("canvas", popup), px = pc.getContext("2d");
+    const onizle = () => {
+      px.clearRect(0, 0, 96, 96); const R = 42 * Math.min(1, 0.25 + M.boyut / Math.max(40, mx_ * 0.35)) , ic = M.sert / 100;
+      const g = px.createRadialGradient(48, 48, R * ic, 48, 48, R); g.addColorStop(0, "rgba(255,255,255,.95)"); g.addColorStop(1, "rgba(255,255,255,0)");
+      px.fillStyle = g; px.beginPath(); px.arc(48, 48, R, 0, 7); px.fill();
+      px.strokeStyle = "rgba(0,0,0,.5)"; px.lineWidth = 1; px.beginPath(); px.arc(48, 48, R, 0, 7); px.stroke();
+    };
+    const [sB, nB, sS, nS] = $$("input", popup);
+    const sinirla = (v, a, b) => mvKelep(Math.round(+v || 0), a, b);
+    const yaz = () => { onizle(); ayarCiz(); };
+    sB.oninput = () => { M.boyut = sinirla(sB.value, 1, mx_); nB.value = M.boyut; yaz(); };
+    nB.oninput = () => { M.boyut = sinirla(nB.value, 1, mx_); sB.value = M.boyut; yaz(); };
+    sS.oninput = () => { M.sert = sinirla(sS.value, 0, 100); nS.value = M.sert; yaz(); };
+    nS.oninput = () => { M.sert = sinirla(nS.value, 0, 100); sS.value = M.sert; yaz(); };
+    onizle(); document.addEventListener("pointerdown", disTik, true);
+  };
+  MV.popupKapat = popupKapat;
+  alan.addEventListener("contextmenu", (e) => { e.preventDefault(); if (FIRCALI.includes(M.arac)) fircaPopup(e.clientX, e.clientY); });
 
   function pointInPoly(x, y, pts) { let ic = false; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) { const [xi, yi] = pts[i], [xj, yj] = pts[j]; if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) ic = !ic; } return ic; }
   const durumIpucu = (t) => { $("#mvIpucu", kok).textContent = t || ""; };
 
   // ---- arayüz: sol araç sütunu, üst ayar çubuğu, sağ panel
   const ARACLAR = mod === "rotus"
-    ? [["klon", "Klon damgası", "Alt + tıkla: kaynağı seç, sonra boyayarak kopyala (S)", "◎"], ["yama", "Yama", "Lekenin çevresini çizerek seçin, sonra seçimi temiz bir alana sürükleyin (J)", "⬚"],
+    ? [["klon", "Klon damgası", "Alt + tıkla: kaynağı seç, sonra boyayarak kopyala (S)", "◎"], ["yama", "Yama", "Lekenin çevresini elle çizerek seçin, sonra seçimi temiz bir alana sürükleyin (J)", "⬚"],
        ["nokta", "Nokta iyileştirme", "Lekenin üzerine tıklayın: çevreden en uygun dokuyla otomatik doldurur (Q)", "✦"], ["yumusat", "Cilt yumuşat", "Fırçayla ten düzensizliğini yumuşatır, dokuyu korur (W)", "◌"]]
     : [["sac", "Saç fırçası", "Kenarı iyileştir: saç tellerini renk farkına göre geri getirir, gri haleyi siler (S)", "≋"], ["ekle", "Ekle", "Fırçanın altını kişiye ekler (A)", "＋"], ["sil", "Sil", "Fırçanın altını fon olarak siler (E)", "−"],
        ["yumusat", "Yumuşat", "Maske kenarını yumuşatır (U)", "◌"], ["keskin", "Keskinleştir", "Maske kenarını netleştirir (K)", "◆"], ["daralt", "Daralt", "Kenarı içe doğru kaydırır (D)", "⇥"], ["genislet", "Genişlet", "Kenarı dışa doğru kaydırır (G)", "⇤"]];
   const sol = $("#mvSol", kok);
-  const solCiz = () => { sol.innerHTML = ""; ARACLAR.forEach(([k, ad, ip, ik]) => { const b = h(`<button class="mv-arac ${M.arac === k ? "secili" : ""}" title="${esc(ad + " — " + ip)}"><span>${ik}</span><small>${esc(ad)}</small></button>`); b.onclick = () => { M.arac = k; M.sel = null; arayuzGuncelle(); }; sol.append(b); }); };
+  const solCiz = () => { sol.innerHTML = ""; ARACLAR.forEach(([k, ad, ip, ik]) => { const b = h(`<button class="mv-arac ${M.arac === k ? "secili" : ""}" title="${esc(ad + " — " + ip)}"><span>${ik}</span><small>${esc(ad)}</small></button>`); b.onclick = () => { popupKapat(); M.arac = k; M.sel = null; selCiz(); arayuzGuncelle(); }; sol.append(b); }); };
   const ayarEl = $("#mvAyar", kok);
   const slider = (etiket, ip, min, max, deger, birim, cb) => {
     const e = h(`<label class="mv-s" title="${esc(ip)}"><span>${etiket}</span><button type="button" class="ok">◄</button><input type="range" min="${min}" max="${max}" value="${deger}"><button type="button" class="ok">►</button><b>${deger}${birim}</b></label>`);
@@ -319,11 +354,23 @@ async function manuelAc(mod) {
   const secimEl = (etiket, ip, deger, cb) => { const e = h(`<label class="mv-c" title="${esc(ip)}"><input type="checkbox" ${deger ? "checked" : ""}><span>${etiket}</span></label>`); $("input", e).onchange = (ev) => cb(ev.target.checked); return e; };
   const ayarCiz = () => {
     ayarEl.innerHTML = "";
-    ayarEl.append(slider("Boyut", "Fırça boyutu (piksel). Kısayol: [ ve ]", 4, Math.round(W / 6), M.boyut, "", v => M.boyut = v));
-    if (M.arac !== "yama" && M.arac !== "nokta" || M.arac === "nokta") ayarEl.append(slider("Sertlik", "Fırça kenarı: düşük = yumuşak geçiş", 0, 100, M.sert, "%", v => M.sert = v));
-    const gucAd = {klon: "Opaklık", yama: "Uyum", nokta: "Güç", yumusat: "Güç", sac: "Güç", ekle: "Güç", sil: "Güç", keskin: "Güç", daralt: "Güç", genislet: "Güç"}[M.arac];
-    const gucIp = {klon: "Kopyalanan dokunun şeffaflığı (Photoshop'taki Opacity)", yama: "Yamanın çevre ışığına uyumu (Diffusion)"}[M.arac] || "Fırça etkisinin gücü";
-    ayarEl.append(slider(gucAd, gucIp, 1, 100, M.guc, "%", v => M.guc = v));
+    if (FIRCALI.includes(M.arac)) {
+      const chip = h(`<button type="button" class="mv-chip" title="Fırça boyutu ve sertliği: fotoğraf üzerinde sağ tıklayın (veya buraya tıklayın). Kısayol: [ ] boyut, Shift+[ ] sertlik">◯ ${M.boyut}px · %${M.sert}</button>`);
+      chip.onclick = () => { const r = chip.getBoundingClientRect(); fircaPopup(r.left + r.width / 2, r.bottom); };
+      ayarEl.append(chip);
+    }
+    if (M.arac === "yama") {
+      const g = h(`<div class="mv-seg" title="Kaynak: seçili lekeyi, sürüklediğiniz temiz alanla doldurur. Hedef: seçili temiz alanı sürüklediğiniz yere kopyalar"><span>Yama</span><button type="button" class="${M.yMod === "kaynak" ? "ac" : ""}">Kaynak</button><button type="button" class="${M.yMod === "hedef" ? "ac" : ""}">Hedef</button></div>`);
+      const [bk, bh] = $$("button", g); bk.onclick = () => { M.yMod = "kaynak"; ayarCiz(); }; bh.onclick = () => { M.yMod = "hedef"; ayarCiz(); };
+      ayarEl.append(g);
+      ayarEl.append(slider("Yayılım", "Yama kenarının çevreye karışma miktarı (Photoshop'taki Diffusion)", 1, 7, M.yay, "", v => M.yay = v));
+      ayarEl.append(slider("Uyum", "Yamanın çevre ışığına ve rengine uyumu", 1, 100, M.guc, "%", v => M.guc = v));
+    } else {
+      const gucAd = {klon: "Opaklık", nokta: "Güç", yumusat: "Güç", sac: "Güç", ekle: "Güç", sil: "Güç", keskin: "Güç", daralt: "Güç", genislet: "Güç"}[M.arac];
+      const gucIp = {klon: "Kopyalanan dokunun en fazla şeffaflığı (Photoshop'taki Opacity)"}[M.arac] || "Fırça etkisinin gücü";
+      ayarEl.append(slider(gucAd, gucIp, 1, 100, M.guc, "%", v => M.guc = v));
+      if (M.arac === "klon") ayarEl.append(slider("Akış", "Aynı yere tekrar boyadıkça etkinin birikme hızı (Photoshop'taki Flow)", 1, 100, M.akis, "%", v => M.akis = v));
+    }
     if (M.arac === "yumusat" && mod === "rotus") ayarEl.append(slider("Doku", "Yumuşatırken korunan ince doku miktarı", 0, 100, M.doku, "%", v => M.doku = v));
     if (M.arac === "klon") ayarEl.append(secimEl("Hizalı", "Açık: kaynak ile hedef arasındaki fark vuruşlar arasında sabit kalır (Photoshop'taki Aligned)", M.hizali, v => { M.hizali = v; M.ofs = null; }));
     if (mod === "dekupe") ayarEl.append(slider("Renk taşması", "Kenardaki eski fon rengini temizleme miktarı (önizleme ve sonuç)", 0, 100, M.tasma, "%", v => { M.tasma = v; tumuBoya(); }));
@@ -356,10 +403,12 @@ async function manuelAc(mod) {
       if (e.code === "Space") { M.bosluk = true; alan.style.cursor = "grab"; e.preventDefault(); return; }
       if (e.ctrlKey && k === "z") { e.preventDefault(); e.shiftKey ? ileriAl() : geriAl(); return; }
       if (e.ctrlKey && k === "y") { e.preventDefault(); ileriAl(); return; }
+      if (e.shiftKey && (e.key === "{" || e.key === "}")) { M.sert = mvKelep(M.sert + (e.key === "{" ? -10 : 10), 0, 100); ayarCiz(); return; }
       if (e.key === "[") { M.boyut = Math.max(4, Math.round(M.boyut * 0.85)); ayarCiz(); return; }
       if (e.key === "]") { M.boyut = Math.min(Math.round(W / 6), Math.round(M.boyut * 1.18)); ayarCiz(); return; }
       if (e.key === "\\") { if (!M.onceMi) { M.onceMi = true; if (mod === "dekupe") boyaDekupe(0, 0, W, H); cx.putImageData(orig, 0, 0); } return; }
       if (e.key === "0") { sigdir(); return; }
+      if ((e.key === "Escape" || e.key === "Enter") && popup) { popupKapat(); return; }
       if (e.key === "Escape") { if (M.sel) { M.sel = null; selCiz(); } else iptal(); return; }
       const eslesme = mod === "rotus" ? {s: "klon", j: "yama", q: "nokta", w: "yumusat"} : {s: "sac", a: "ekle", e: "sil", u: "yumusat", k: "keskin", d: "daralt", g: "genislet"};
       if (!e.ctrlKey && eslesme[k]) { M.arac = eslesme[k]; M.sel = null; arayuzGuncelle(); }
@@ -369,7 +418,7 @@ async function manuelAc(mod) {
     }
   };
   document.addEventListener("keydown", tusIndir); document.addEventListener("keyup", tusIndir);
-  const kapatMV = () => { document.removeEventListener("keydown", tusIndir); document.removeEventListener("keyup", tusIndir); window.removeEventListener("resize", sigdir); kok.remove(); MV.acik = false; MV.m = null; };
+  const kapatMV = () => { popupKapat(); document.removeEventListener("keydown", tusIndir); document.removeEventListener("keyup", tusIndir); window.removeEventListener("resize", sigdir); kok.remove(); MV.acik = false; MV.m = null; };
   const iptal = () => { if (M.kirli && !confirm("Yaptığınız düzenlemeler atılsın mı?")) return; kapatMV(); };
   $("#mvIptal", kok).onclick = iptal;
 
