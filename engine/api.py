@@ -100,6 +100,12 @@ class Api:
         out["matte"] = {k: v for k, v in j.matte_params.items()}
         out["rotus"] = {k: v for k, v in j.retouch_params.items() if k not in ("spots", "geri_al", "fircalar", "koruma_fircalar", "klon")}
         out["klon_sayisi"] = len(j.retouch_params.get("klon") or [])
+        out["sekil_sayisi"] = len(j.shape_ops)
+        out["omuz"] = j.omuz
+        try:
+            out["omuz_fark"] = j.omuz_fark() if j.matted else None
+        except Exception:
+            out["omuz_fark"] = None
         out["bg"] = dict(j.bg)
         out["geom"] = dict(j.geom)
         out["duzeltme_sayisi"] = len(j.edits)
@@ -343,6 +349,38 @@ class Api:
                                                            "val": float(e.get("val", 1.0)), "hard": float(e.get("hard", 0.4))})
             self._p(0.4, "Klon damgası uygulanıyor")
             j.retouch(self._p)
+            return self._state(j, fid)
+        return self._safe(go)
+
+    def sekil_firca(self, jid, fid, e):
+        """Şekillendir. e: {tur:'it'|'sis'|'kuc', pts (önizleme 0..1), r (önizleme genişliğine oranla), guc 0..1}"""
+        def go():
+            j = self.jobs[jid]
+            pts = []
+            for px, py in e["pts"]:
+                x, y, s = self._to_work(j, fid, px, py)
+                pts.append((x, y))
+            M, (Wc, Hc), ppm, s = j.transform(self._fmt(fid), EDIT_MULT)
+            r = e["r"] * Wc / s / j.W.shape[1]
+            j.shape_ops.append({"t": e["tur"], "pts": pts, "r": r, "guc": float(e.get("guc", 0.6))})
+            return self._state(j, fid)
+        return self._safe(go)
+
+    def sekil_geri_al(self, jid, fid, hepsi=False):
+        def go():
+            j = self.jobs[jid]
+            if hepsi:
+                j.shape_ops.clear(); j.omuz = 0.0
+            elif j.shape_ops:
+                j.shape_ops.pop()
+            return self._state(j, fid)
+        return self._safe(go)
+
+    def sekil_omuz(self, jid, fid, miktar):
+        """Otomatik omuz hizalama. miktar: 0 (kapalı) … 1 (tam düzeltme)."""
+        def go():
+            j = self.jobs[jid]
+            j.omuz = max(0.0, min(1.0, float(miktar)))
             return self._state(j, fid)
         return self._safe(go)
 

@@ -17,7 +17,7 @@ window.onerror = (m, s, l) => { try { api.log_js_error(`${m} @${l}`); } catch (e
 const ADIMLAR = ["Başlangıç", "Arka Plan", "Rötuş", "Ölçekleme", "Baskı ve Kayıt"];
 const S = {
   init: null, fmt: {}, fid: "bio56", adim: 0, isler: [], cur: null, st: null, gorunum: "sonuc", arac: "sam+",
-  firca: 40, bilgi: {musteri: "", no: "", adet: 4}, ayar: {}, karsilastir: 50, lekeArac: false, sayfa: null, rArac: "k", rVal: 70, kHard: 40, kVal: 100, kSrc: null, rGor: "sonuc", seciliLeke: -1,
+  firca: 40, bilgi: {musteri: "", no: "", adet: 4}, ayar: {}, karsilastir: 50, lekeArac: false, sayfa: null, rArac: "k", sGuc: 60, rVal: 70, kHard: 40, kVal: 100, kSrc: null, rGor: "sonuc", seciliLeke: -1,
 };
 
 // ------------------------------------------------------------------ meşgul / ilerleme
@@ -371,11 +371,12 @@ function rotusTuval(sh, alan, ic, kat, norm, ana) {
   const A = S.rArac || "k";
   const T = (k, ad, ip) => `<button class="arac ${A === k ? "secili" : ""}" data-a="${k}" title="${ip}">${ad}</button>`;
   const fs = S.st.firca_sayisi || [0, 0];
-  const ar = h(`<div class="araclar">${T("k", "Karşılaştır", "Önce / sonra sürgüsü")}${T("l", "Leke fırçası", "Tıklanan yeri leke olarak temizler (L)")}${T("g", "Geri al fırçası", "Rötuşu fırçayla yüzdelik olarak siler, orijinale döndürür (G)")}${T("p", "Koruma fırçası", "Fırçayla boyanan yer rötuştan korunur (P)")}${T("n", "Klon damgası", "Alt + tıkla: kaynak seç, sonra boyayarak kopyala (S)")}${T("t", "Ten örneği", "Gelişmiş portre rötuşu için ten rengi örneği seç (T)")}<span class="arac-ayrac"></span><button class="arac ${S.lekeGoster ? "secili" : ""}" data-a="x" title="Bulunan lekeleri göster/gizle">Lekeleri göster</button><button class="arac ${S.rGor === "koruma" ? "secili" : ""}" data-a="v" title="Rötuşun dokunmadığı bölgeleri yeşil gösterir (K)">Koruma haritası</button><button class="arac" data-a="u" title="Son fırça darbesini geri al">↶ Fırça geri al</button><button class="arac" data-a="uk" title="Son klon darbesini geri al">↶ Klon geri al${S.st.klon_sayisi ? " (" + S.st.klon_sayisi + ")" : ""}</button></div>`);
+  const ar = h(`<div class="araclar">${T("k", "Karşılaştır", "Önce / sonra sürgüsü")}${T("l", "Leke fırçası", "Tıklanan yeri leke olarak temizler (L)")}${T("g", "Geri al fırçası", "Rötuşu fırçayla yüzdelik olarak siler, orijinale döndürür (G)")}${T("p", "Koruma fırçası", "Fırçayla boyanan yer rötuştan korunur (P)")}${T("n", "Klon damgası", "Alt + tıkla: kaynak seç, sonra boyayarak kopyala (S)")}${T("t", "Ten örneği", "Gelişmiş portre rötuşu için ten rengi örneği seç (T)")}<span class="arac-ayrac"></span>${T("m", "İt / çek", "Omuz ve giysi kenarını fırçayla it (M). Yüz kilitlidir")}${T("b", "Şişir", "Fırçanın altını büyüt (B). Yüz kilitlidir")}${T("z", "Küçült", "Fırçanın altını küçült (Z). Yüz kilitlidir")}<span class="arac-ayrac"></span><button class="arac ${S.lekeGoster ? "secili" : ""}" data-a="x" title="Bulunan lekeleri göster/gizle">Lekeleri göster</button><button class="arac ${S.rGor === "koruma" ? "secili" : ""}" data-a="v" title="Rötuşun dokunmadığı bölgeleri yeşil gösterir (K)">Koruma haritası</button><button class="arac" data-a="u" title="Son fırça darbesini geri al">↶ Fırça geri al</button><button class="arac" data-a="us" title="Son şekillendirme darbesini geri al">↶ Şekil geri al${S.st.sekil_sayisi ? " (" + S.st.sekil_sayisi + ")" : ""}</button><button class="arac" data-a="uk" title="Son klon darbesini geri al">↶ Klon geri al${S.st.klon_sayisi ? " (" + S.st.klon_sayisi + ")" : ""}</button></div>`);
   $$(".arac", ar).forEach(b => b.onclick = async () => {
     const a = b.dataset.a;
     if (a === "x") S.lekeGoster = !S.lekeGoster;
     else if (a === "v") { S.rGor = S.rGor === "koruma" ? "sonuc" : "koruma"; S.st.gorsel_koruma = null; }
+    else if (a === "us") { const r = await cagir("sekil_geri_al", S.cur, S.fid); if (r.ok) { S.st = {...r, gorsel_once: S.st.gorsel_once}; } }
     else if (a === "uk") { const r = await cagir("klon_geri_al", S.cur, S.fid); if (r.ok) { S.st = {...r, gorsel_once: S.st.gorsel_once}; } }
     else if (a === "u") { const t = (S.rArac === "p") ? "koru" : "geri"; const r = await cagir("rotus_firca_geri_al", S.cur, S.fid, t); if (r.ok) { S.st = {...r, gorsel_once: S.st.gorsel_once}; } }
     else S.rArac = a;
@@ -394,6 +395,12 @@ function rotusTuval(sh, alan, ic, kat, norm, ana) {
     $("#nfy", nb).oninput = (e) => { S.kHard = 100 - +e.target.value; $("b", e.target.parentNode).textContent = "%" + e.target.value; };
     $("#nfo", nb).oninput = (e) => { S.kVal = +e.target.value; $("b", e.target.parentNode).textContent = "%" + S.kVal; };
     sh.append(nb);
+  }
+  if (A === "m" || A === "b" || A === "z") {
+    const sb = h(`<div class="araclar alt-y"><label>Fırça boyutu <input type="range" min="20" max="260" value="${S.firca}" id="sfb"> <b>${S.firca}</b></label><label>Güç <input type="range" min="10" max="100" value="${S.sGuc}" id="sfg"> <b>%${S.sGuc}</b></label><span class="not" style="margin:0">${A === "m" ? "Omuz kenarından <b>içe/dışa sürükleyin</b>" : "Bölgenin üzerinde <b>tıklayıp basılı tutun</b> ya da gezdirin"}. Yüz kilitli.</span></div>`);
+    $("#sfb", sb).oninput = (e) => { S.firca = +e.target.value; $("b", e.target.parentNode).textContent = S.firca; };
+    $("#sfg", sb).oninput = (e) => { S.sGuc = +e.target.value; $("b", e.target.parentNode).textContent = "%" + S.sGuc; };
+    sh.append(sb);
   }
   if (A === "t") sh.append(h(`<div class="araclar alt-y"><span class="not" style="margin:0">Yüzde <b>ten renginde</b> 1-4 noktaya tıklayın (yanak, alın). Gelişmiş yumuşatma yalnız bu renge benzeyen yerlere uygulanır.</span></div>`));
   (S.st.pro_ornekler || []).forEach(([x, y]) => kat.append(h(`<span class="ornek-isaret" style="left:${x * 100}%;top:${y * 100}%"></span>`)));
@@ -435,7 +442,7 @@ function rotusTuval(sh, alan, ic, kat, norm, ana) {
     if (r.ok) guncelle(r);
   });
   // geri al / koruma / klon fırçaları
-  if (A === "g" || A === "p" || A === "n") {
+  if (A === "g" || A === "p" || A === "n" || A === "m" || A === "b" || A === "z") {
     let cizim = null;
     const im = h(`<div class="firca-imlec" style="display:none"></div>`); alan.append(im);
     alan.addEventListener("mousemove", (e) => {
@@ -452,7 +459,7 @@ function rotusTuval(sh, alan, ic, kat, norm, ana) {
       const path = document.createElementNS(svgNS, "path"); const [x, y] = norm(e);
       path.setAttribute("d", `M${x * 1000} ${y * 1000}`);
       const rr = ic.getBoundingClientRect();
-      path.setAttribute("stroke", A === "g" ? "rgba(255,190,80,.55)" : A === "n" ? "rgba(120,170,255,.5)" : "rgba(61,214,140,.55)");
+      path.setAttribute("stroke", A === "g" ? "rgba(255,190,80,.55)" : (A === "m" || A === "b" || A === "z") ? "rgba(255,120,200,.45)" : A === "n" ? "rgba(120,170,255,.5)" : "rgba(61,214,140,.55)");
       path.setAttribute("stroke-width", S.firca / rr.width * 1000); path.setAttribute("fill", "none"); path.setAttribute("stroke-linecap", "round"); path.setAttribute("stroke-linejoin", "round");
       svg.append(path); kat.append(svg);
       cizim = {pts: [[x, y]], path, w: rr.width};
@@ -460,6 +467,11 @@ function rotusTuval(sh, alan, ic, kat, norm, ana) {
     alan.addEventListener("mouseup", async () => {
       if (!cizim) return;
       const c = cizim; cizim = null;
+      if (A === "m" || A === "b" || A === "z") {
+        const r = await cagir("sekil_firca", S.cur, S.fid, {tur: A === "m" ? "it" : A === "b" ? "sis" : "kuc", pts: c.pts, r: S.firca / 2 / c.w, guc: S.sGuc / 100});
+        if (r.ok) guncelle(r);
+        return;
+      }
       if (A === "n") {
         if (!S.kOfs) S.kOfs = [S.kSrc[0] - c.pts[0][0], S.kSrc[1] - c.pts[0][1]];   // hizalı: kaynak–hedef farkı vuruşlar arasında sabit
         const k0 = [c.pts[0][0] + S.kOfs[0], c.pts[0][1] + S.kOfs[1]];
@@ -793,6 +805,13 @@ function panelRotus(p) {
   gk.append(kaydirici("ke", "Eşik", ks.esik ?? 0, 0, 20, 1, "", sk("esik"), "Düşük kontrastlı yerleri (gürültü, cilt) keskinleştirme"));
   gk.append(secim("kc", "Cildi koru (yüzde daha az keskinlik)", ks.cilt_koru !== false, sk("cilt_koru")));
   p.append(gk);
+  const gs = bolum("ŞEKİLLENDİR (omuz ve duruş)");
+  gs.append(kaydirici("om", "Otomatik omuz hizalama", Math.round((S.st.omuz || 0) * 100), 0, 100, 1, "%", async v => { const x = await cagir("sekil_omuz", S.cur, S.fid, v / 100); if (x.ok) { S.st = {...x, gorsel_once: S.st.gorsel_once}; sahneCiz(); panelCiz(); } }, "Omuz hattı farkını (yüzü değiştirmeden) giderir"));
+  gs.append(h(`<div class="not">${S.st.omuz_fark == null ? "Omuz farkı ölçülemedi." : Math.abs(S.st.omuz_fark) < 6 ? "Omuzlar zaten dengeli." : `Ölçülen omuz farkı: <b>${Math.abs(S.st.omuz_fark).toFixed(0)} px</b> (${S.st.omuz_fark > 0 ? "sol" : "sağ"} omuz daha aşağıda).`} Elle düzeltmek için araç çubuğundan <b>İt / çek</b>, <b>Şişir</b>, <b>Küçült</b>. Yüz bölgesi kilitlidir.</div>`));
+  const gsb = h(`<button class="btn kucuk">Şekillendirmeyi sıfırla</button>`);
+  gsb.onclick = async () => { const x = await cagir("sekil_geri_al", S.cur, S.fid, true); if (x.ok) { S.st = {...x, gorsel_once: S.st.gorsel_once}; sahneCiz(); panelCiz(); } };
+  gs.append(gsb);
+  p.append(gs);
   const kb = bolum("DETAY KORUMA");
   kb.append(kaydirici("kr", "Koruma gücü (kirpik, kaş, bıyık, sakal, burun delikleri)", r.koruma, 0, 100, 1, "", set("koruma"), "Bu bölgelere rötuş dokunmaz. Yeşil harita için K tuşu"));
   kb.append(secim("gv", "Güvenli sınır (kişiye ait kırışık/ben/sakal korunur)", r.guvenli, set("guvenli")));
@@ -1166,7 +1185,7 @@ document.addEventListener("keydown", (e) => {
   }
   if (S.adim === 2) {
     const kk = k.toLowerCase();
-    const m = {l: "l", g: "g", p: "p", c: "k", s: "n", t: "t"}[kk];
+    const m = {l: "l", g: "g", p: "p", c: "k", s: "n", t: "t", m: "m", b: "b", z: "z"}[kk];
     if (m) { S.rArac = (S.rArac === m && m !== "k") ? "k" : m; sahneCiz(); }
     if (kk === "k") { S.rGor = S.rGor === "koruma" ? "sonuc" : "koruma"; S.st.gorsel_koruma = null; sahneCiz(); }
     if (k === "Delete" || k === "Backspace") { e.preventDefault(); S.silLeke && S.silLeke(); }

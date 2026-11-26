@@ -12,6 +12,7 @@ import numpy as np
 from . import face as F
 from . import models
 from .formats import FORMATS, GRADIENTS, GRADIENT_DEFAULTS, SOLIDS, MM, photo_px
+from . import shape as SH
 from .finish import DEFAULT_PRO, DEFAULT_KESKIN, skin_sample_mask, portrait_smooth, clone_apply, unsharp
 from .imgutil import (imread_any, guided_filter, estimate_foreground, hex2bgr, apply_lut)
 from .log import log
@@ -56,6 +57,10 @@ class Job:
         self.matted = False
         self.A = None
         self.Wr = None
+        self.shape_ops = []          # Şekillendir fırça işlemleri
+        self.omuz = 0.0              # uygulanan omuz düzeltmesi (0 = kapalı, 1 = tam düzeltme)
+        self._shape_key = None
+        self._shape_maps = None
         self._retouch_key = None
         self._fg_cache = None
         self.edits = []
@@ -669,6 +674,23 @@ class Job:
         return {"tepe_mm": round(c_mm, 1), "cene_mm": round(ch_mm, 1), "goz_mm": round(e_mm, 1),
                 "bas_mm": round(ch_mm - c_mm, 1), "merkez_mm": round(F.apply(M, eye)[0] / ppm, 1)}
 
+    def omuz_fark(self):
+        """Ölçülen omuz yükseklik farkı (piksel); yoksa None."""
+        if self.A is None or self.labels is None:
+            return None
+        return SH.measure_shoulders(self.A, self.labels, self.iod)
+
+    def _shaped(self, arr):
+        """Şekillendir uygulanmışsa yer değiştirme alanını görüntüye uygular."""
+        if not self.shape_ops and not self.omuz:
+            return arr
+        fark = (self.omuz_fark() or 0.0) * float(self.omuz) if self.omuz else 0.0
+        key = _key([self.shape_ops, round(fark, 1)])
+        if key != self._shape_key:
+            self._shape_maps = SH.build_maps(self.labels.shape, self.labels, self.iod, self.shape_ops, fark)
+            self._shape_key = key
+        return SH.apply(arr, self._shape_maps)
+
     def _foreground(self):
         if self._fg_cache is None:
             I = self.Wr.astype(np.float32) / 255
@@ -684,6 +706,8 @@ class Job:
             mult = 1 if preview else SS
         M, (Wc, Hc), ppm, s = self.transform(fmt, mult)
         src = self.Wr if (self.Wr is not None and stage != "raw") else self.W
+        if stage != "raw":
+            src = self._shaped(src)
         interp = cv2.INTER_AREA if s < 1 else cv2.INTER_CUBIC
         if s < 0.5:
             # kenar yumuşaması (aliasing) önlemi
@@ -692,7 +716,7 @@ class Job:
         canvas = cv2.warpAffine(src, M, (Wc, Hc), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
         if self.A is None:
             return self._finish(canvas, fmt, preview)
-        A = cv2.warpAffine(self.A, M, (Wc, Hc), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+        A = cv2.warpAffine(self._shaped(self.A) if stage != "raw" else self.A, M, (Wc, Hc), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
         if show_alpha:
             return (A * 255).astype(np.uint8)
         bg = self.bg
@@ -711,7 +735,7 @@ class Job:
                 out = out + (255 - out) * t * inv
             out = np.clip(out, 0, 255).astype(np.uint8)
         else:
-            Fg = cv2.warpAffine(self._foreground(), M, (Wc, Hc), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+            Fg = cv2.warpAffine(self._shaped(self._foreground()), M, (Wc, Hc), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
             back = self._background(fmt, bg, tip, Wc, Hc)
             a = A[..., None]
             out = np.clip(Fg.astype(np.float32) * a + back * (1 - a), 0, 255).astype(np.uint8)
