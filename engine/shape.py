@@ -48,12 +48,22 @@ def measure_shoulders(A, labels, iod):
     return tops["L"] - tops["R"]
 
 
+_LOCK_CACHE = {}
+
+
 def build_maps(shape, labels, iod, ops, omuz_fark=0.0, A=None, kilit=True):
     """(map_x, map_y) float32. ops: [{t:'it'|'sis'|'kuc', pts:[[x,y]..] (0..1), r (genişliğe oranla), guc (0..1)}]."""
     H, W = shape
     dx = np.zeros((H, W), np.float32)
     dy = np.zeros((H, W), np.float32)
-    lock = (1 - face_lock(labels, iod)) if kilit else np.ones((H, W), np.float32)
+    if kilit:
+        # yüz kilidi pahalı: aynı etiket haritası için bir kez hesaplanır (canlı önizlemede her harekette tekrarlanmasın)
+        ck = (id(labels), labels.shape, round(float(iod), 2))
+        if _LOCK_CACHE.get("k") != ck:
+            _LOCK_CACHE["k"] = ck; _LOCK_CACHE["v"] = (1 - face_lock(labels, iod)).astype(np.float32)
+        lock = _LOCK_CACHE["v"]
+    else:
+        lock = np.ones((H, W), np.float32)
     for op in ops:
         r = max(4.0, op["r"] * W)
         guc = float(op.get("guc", 0.6))

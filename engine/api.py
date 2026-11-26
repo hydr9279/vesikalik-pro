@@ -65,7 +65,7 @@ class Api:
     def _fmt(self, fid):
         return FORMATS[fid]
 
-    def _view(self, j: Job, fid: str, mode: str = "sonuc"):
+    def _view(self, j: Job, fid: str, mode: str = "sonuc", hizli: bool = False):
         fmt = self._fmt(fid)
         M, (Wc, Hc), ppm, s = j.transform(fmt, EDIT_MULT)
         if mode == "maske" and j.A is not None:
@@ -79,7 +79,7 @@ class Api:
             img = cv2.warpAffine(j.W, M, (Wc, Hc), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
         else:
             img = j.render(fmt, preview=True, mult=EDIT_MULT)
-        return to_b64(img, max_side=1600)
+        return to_b64(img, max_side=900, quality=80) if hizli else to_b64(img, max_side=1600)
 
     def _to_work(self, j, fid, x, y):
         """Önizleme koordinatı (0..1) → çalışma görüntüsü koordinatı (0..1)."""
@@ -594,6 +594,23 @@ class Api:
             return self._state(j, fid)
         return self._safe(go)
 
+    def sekil_onizle(self, jid, fid, e):
+        """Şekillendir fırçasını sürüklerken canlı önizleme: işlemi kaydetmeden sonucu döndürür."""
+        def go():
+            j = self._jobs[jid]
+            pts = []
+            for px, py in e["pts"]:
+                x, y, s = self._to_work(j, fid, px, py)
+                pts.append((x, y))
+            M, (Wc, Hc), ppm, s = j.transform(self._fmt(fid), EDIT_MULT)
+            r = e["r"] * Wc / s / j.W.shape[1]
+            j.shape_ops.append({"t": e["tur"], "pts": pts, "r": r, "guc": float(e.get("guc", 0.6))})
+            try:
+                return {"gorsel": self._view(j, fid, hizli=True)}
+            finally:
+                j.shape_ops.pop()
+        return self._safe(go)
+
     def sekil_geri_al(self, jid, fid, hepsi=False):
         def go():
             j = self._jobs[jid]
@@ -709,6 +726,14 @@ class Api:
             j = self._jobs[jid]
             j.geom.update(geom)
             return self._state(j, fid)
+        return self._safe(go)
+
+    def geom_onizle(self, jid, fid, geom):
+        """Çubuk sürüklenirken canlı önizleme: yalnızca görüntüyü (küçük, hızlı) döndürür."""
+        def go():
+            j = self._jobs[jid]
+            j.geom.update(geom)
+            return {"gorsel": self._view(j, fid, hizli=True)}
         return self._safe(go)
 
     def reset_geom(self, jid, fid):

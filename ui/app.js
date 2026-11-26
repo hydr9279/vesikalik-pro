@@ -459,7 +459,14 @@ function rotusTuval(sh, alan, ic, kat, norm, ana) {
     alan.addEventListener("mousemove", (e) => {
       const r = alan.getBoundingClientRect(), d = S.firca;
       Object.assign(im.style, {display: "block", width: d + "px", height: d + "px", left: (e.clientX - r.left - d / 2) + "px", top: (e.clientY - r.top - d / 2) + "px"});
-      if (cizim) { cizim.pts.push(norm(e)); const [x, y] = cizim.pts.at(-1); cizim.path.setAttribute("d", cizim.path.getAttribute("d") + ` L${x * 1000} ${y * 1000}`); }
+      if (cizim) {
+        cizim.pts.push(norm(e)); const [x, y] = cizim.pts.at(-1); cizim.path.setAttribute("d", cizim.path.getAttribute("d") + ` L${x * 1000} ${y * 1000}`);
+        if (A === "m" || A === "b" || A === "z") {   // şekillendir: fırçayı sürüklerken sonucu canlı göster
+          cizim.path.style.opacity = 0.18;
+          const c = cizim, pts = c.pts.length > 160 ? c.pts.filter((_, i) => i % Math.ceil(c.pts.length / 160) === 0 || i === c.pts.length - 1) : c.pts.slice();
+          canliCalistir(() => api.sekil_onizle(S.cur, S.fid, {tur: A === "m" ? "it" : A === "b" ? "sis" : "kuc", pts, r: S.firca / 2 / c.w, guc: S.sGuc / 100}), (g) => { const im = sahneResmi(); if (im) im.src = g; });
+        }
+      }
     });
     alan.addEventListener("mousedown", (e) => {
       if (e.button !== 0 || bosluk) return;
@@ -477,7 +484,7 @@ function rotusTuval(sh, alan, ic, kat, norm, ana) {
     });
     alan.addEventListener("mouseup", async () => {
       if (!cizim) return;
-      const c = cizim; cizim = null;
+      const c = cizim; cizim = null; canliIptal();
       if (A === "m" || A === "b" || A === "z") {
         const r = await cagir("sekil_firca", S.cur, S.fid, {tur: A === "m" ? "it" : A === "b" ? "sis" : "kuc", pts: c.pts, r: S.firca / 2 / c.w, guc: S.sGuc / 100});
         if (r.ok) guncelle(r);
@@ -564,11 +571,34 @@ function olcekTuval(sh, alan, ic, kat, norm) {
   alan.addEventListener("lostpointercapture", surBitir);
 }
 let geomT = null, geomBekleyen = {};
+// Canlı önizleme: istekler üst üste binmez, her zaman en son değer işlenir; eski yanıtlar atılır
+const CANLI = {busy: false, bekle: null, jeton: 0};
+async function canliCalistir(istek, uygula) {
+  const jeton = CANLI.jeton; CANLI.bekle = {istek, uygula, jeton};
+  if (CANLI.busy) return;
+  CANLI.busy = true;
+  try {
+    while (CANLI.bekle) {
+      const b = CANLI.bekle; CANLI.bekle = null;
+      const r = await b.istek();
+      if (r && r.ok && r.gorsel && b.jeton === CANLI.jeton) b.uygula(r.gorsel);
+    }
+  } finally { CANLI.busy = false; }
+}
+const canliIptal = () => { CANLI.jeton++; CANLI.bekle = null; };
+const sahneResmi = () => document.querySelector("#sahne .tuval-ic > img");
+function geomAnlik(d) {
+  Object.assign(S.st.geom, d); Object.assign(geomBekleyen, d);
+  const gonder = Object.assign({}, geomBekleyen);
+  canliCalistir(() => api.geom_onizle(S.cur, S.fid, gonder), (g) => { const im = sahneResmi(); if (im) im.src = g; });
+}
 function geomDegis(d) {
+  canliIptal();
   Object.assign(S.st.geom, d); Object.assign(geomBekleyen, d);
   clearTimeout(geomT);
   geomT = setTimeout(async () => {
     const g = geomBekleyen; geomBekleyen = {};
+    while (CANLI.busy) await new Promise(res => setTimeout(res, 15));   // süren canlı önizleme bitsin, son değer en sonda işlensin
     const r = await api.set_geom(S.cur, S.fid, g);
     if (r.ok) { S.st = r; durumGuncelle(); sahneCiz(); panelCiz(); siraCiz(); }
   }, 90);
@@ -587,11 +617,11 @@ function baskiCiz(sh) {
 }
 
 // ------------------------------------------------------------------ panel
-function kaydirici(ad, etiket, deger, min, max, adim, birim, degisti, bilgi = "") {
+function kaydirici(ad, etiket, deger, min, max, adim, birim, degisti, bilgi = "", anlik = null) {
   const e = h(`<div class="kaydirici" title="${esc(bilgi)}"><div class="ust-s"><label for="k_${ad}">${etiket}</label><span class="deger">${deger}${birim}</span></div><div class="cubuk"><button type="button" class="ok" aria-label="Azalt">◄</button><input id="k_${ad}" type="range" min="${min}" max="${max}" step="${adim}" value="${deger}"><button type="button" class="ok" aria-label="Artır">►</button></div></div>`);
   const inp = $("input", e), [sol, sag] = $$("button.ok", e);
   const nd = (adim + "").includes(".") ? (adim + "").split(".")[1].length : 0;
-  inp.oninput = () => $(".deger", e).textContent = inp.value + birim;
+  inp.oninput = () => { $(".deger", e).textContent = inp.value + birim; if (anlik) anlik(+inp.value); };   // anlik: çubuk sürüklenirken canlı etki
   inp.onchange = () => degisti(+inp.value);
   // ok düğmeleri: tek tık = bir adım, basılı tutunca tekrar, Shift = 10 adım; art arda basışlar tek işleme birleşir
   let bekle = null;
@@ -599,7 +629,7 @@ function kaydirici(ad, etiket, deger, min, max, adim, birim, degisti, bilgi = ""
     const kat = ev && ev.shiftKey ? 10 : 1;
     let v = +inp.value + yon * adim * kat;
     v = Math.min(+max, Math.max(+min, +v.toFixed(nd)));
-    inp.value = v; $(".deger", e).textContent = inp.value + birim;
+    inp.value = v; $(".deger", e).textContent = inp.value + birim; if (anlik) anlik(+inp.value);
     clearTimeout(bekle); bekle = setTimeout(() => degisti(+inp.value), 350);
   };
   [[sol, -1], [sag, 1]].forEach(([b, yon]) => {
@@ -879,10 +909,10 @@ function panelOlcek(p) {
   b.append(secim("sb", "Şablonu göster", S.ayar.sablon_goster !== false, async v => { S.ayar.sablon_goster = v; await api.update_settings({sablon_goster: v}); sahneCiz(); }));
   p.append(b);
   const i = bolum("İNCE AYAR");
-  i.append(kaydirici("zo", "Ölçek", Math.round(g.zoom * 1000) / 10, 70, 140, 0.5, " %", v => geomDegis({zoom: v / 100})));
-  i.append(kaydirici("ro", "Eğim", g.rot, -15, 15, 0.1, "°", v => geomDegis({rot: v})));
-  i.append(kaydirici("dx", "Yatay kaydırma", g.dx, -15, 15, 0.1, " mm", v => geomDegis({dx: v})));
-  i.append(kaydirici("dy", "Dikey kaydırma", g.dy, -15, 15, 0.1, " mm", v => geomDegis({dy: v})));
+  i.append(kaydirici("zo", "Ölçek", Math.round(g.zoom * 1000) / 10, 70, 140, 0.5, " %", v => geomDegis({zoom: v / 100}), "", v => geomAnlik({zoom: v / 100})));
+  i.append(kaydirici("ro", "Eğim", g.rot, -15, 15, 0.1, "°", v => geomDegis({rot: v}), "", v => geomAnlik({rot: v})));
+  i.append(kaydirici("dx", "Yatay kaydırma", g.dx, -15, 15, 0.1, " mm", v => geomDegis({dx: v}), "", v => geomAnlik({dx: v})));
+  i.append(kaydirici("dy", "Dikey kaydırma", g.dy, -15, 15, 0.1, " mm", v => geomDegis({dy: v}), "", v => geomAnlik({dy: v})));
   i.append(secim("du", "Başı otomatik düzleştir", g.duzlestir, v => geomDegis({duzlestir: v})));
   i.append(h(`<div class="not">Ölçülen: tepe ${o.tepe_mm ?? "–"} mm · göz ${o.goz_mm ?? "–"} mm · çene ${o.cene_mm ?? "–"} mm · baş ${o.bas_mm ?? "–"} mm</div>`));
   p.append(i);

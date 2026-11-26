@@ -166,20 +166,21 @@ async function duzenAc(idx) {
   const panel = () => {
     const it2 = M.items[D.idx], p = it2.p; sag.innerHTML = "";
     const set = (k) => (v) => { p[k] = v; yerlestir(); };
+    const kay = (ad, et, d, mn, mx, ad2, br, k) => kaydirici(ad, et, d, mn, mx, ad2, br, set(k), "", set(k));   // anlik: sürüklerken canlı
     const modSel = h(`<div class="alan"><label>Yerleşim</label><select><option value="sigdir" ${p.mod === "sigdir" ? "selected" : ""}>Kırpmadan sığdır (bulanık dolgu)</option><option value="doldur" ${p.mod === "doldur" ? "selected" : ""}>Alanı doldur (kırp)</option></select></div>`);
     $("select", modSel).onchange = (e) => { p.mod = e.target.value; yerlestir(); };
     sag.append(h(`<div class="bolum"><h3>KONUM</h3></div>`));
     const b1 = $(".bolum", sag); b1.append(modSel);
-    b1.append(kaydirici("dz1", "Yakınlaştırma", p.zoom, 0.5, 3, 0.01, "×", set("zoom")));
-    b1.append(kaydirici("dz2", "Yatay kaydır", p.dx, -0.5, 0.5, 0.005, "", set("dx")));
-    b1.append(kaydirici("dz3", "Dikey kaydır", p.dy, -0.5, 0.5, 0.005, "", set("dy")));
-    b1.append(kaydirici("dz4", "Eğim", p.rot, -15, 15, 0.1, "°", set("rot")));
+    b1.append(kaydirici("dz1", "Yakınlaştırma", p.zoom, 0.5, 3, 0.01, "×", set("zoom"), "", set("zoom")));
+    b1.append(kaydirici("dz2", "Yatay kaydır", p.dx, -0.5, 0.5, 0.005, "", set("dx"), "", set("dx")));
+    b1.append(kaydirici("dz3", "Dikey kaydır", p.dy, -0.5, 0.5, 0.005, "", set("dy"), "", set("dy")));
+    b1.append(kaydirici("dz4", "Eğim", p.rot, -15, 15, 0.1, "°", set("rot"), "", set("rot")));
     const b2 = h(`<div class="bolum"><h3>RENK</h3></div>`);
-    b2.append(kaydirici("dz5", "Pozlama (EV)", p.poz, -1.5, 1.5, 0.05, "", set("poz")));
-    b2.append(kaydirici("dz6", "Parlaklık", p.parlaklik, -60, 60, 1, "", set("parlaklik")));
-    b2.append(kaydirici("dz7", "Kontrast", p.kontrast, -100, 100, 1, "", set("kontrast")));
-    b2.append(kaydirici("dz8", "Doygunluk", p.doygunluk, -100, 100, 1, "", set("doygunluk")));
-    b2.append(kaydirici("dz9", "Sıcaklık", p.sicaklik, -100, 100, 1, "", set("sicaklik")));
+    b2.append(kaydirici("dz5", "Pozlama (EV)", p.poz, -1.5, 1.5, 0.05, "", set("poz"), "", set("poz")));
+    b2.append(kaydirici("dz6", "Parlaklık", p.parlaklik, -60, 60, 1, "", set("parlaklik"), "", set("parlaklik")));
+    b2.append(kaydirici("dz7", "Kontrast", p.kontrast, -100, 100, 1, "", set("kontrast"), "", set("kontrast")));
+    b2.append(kaydirici("dz8", "Doygunluk", p.doygunluk, -100, 100, 1, "", set("doygunluk"), "", set("doygunluk")));
+    b2.append(kaydirici("dz9", "Sıcaklık", p.sicaklik, -100, 100, 1, "", set("sicaklik"), "", set("sicaklik")));
     sag.append(b2);
     const sf = h(`<div class="bolum"><div class="satir"><button class="btn genis" id="dzSifir" title="Bu fotoğrafın tüm ayarlarını başa döndürür">↺ Ayarları sıfırla</button></div><div class="not" style="margin-top:8px">Önizleme yaklaşıktır; baskı çıktısı program tarafından tam hesaplanır.</div></div>`);
     $("#dzSifir", sf).onclick = () => { it2.p = {...VARS}; panel(); yerlestir(); };
