@@ -158,7 +158,7 @@ class Api:
         try:
             try:
                 models.set_gpu(bool(storage.load_settings().get("gpu_kullan", True)))
-                models.set_disabled(storage.load_settings().get("model_kapali", []))
+                models.set_disabled(self._kapali_modeller())
             except Exception:
                 pass
             s = storage.public_settings()
@@ -359,7 +359,7 @@ class Api:
 
     def model_listesi(self):
         def go():
-            kapali = set(storage.load_settings().get("model_kapali", []))
+            kapali = set(self._kapali_modeller())
             out = []
             for k in models.MATTE_ORDER + ["vitmatte"]:
                 m = models.MODELS[k]
@@ -406,13 +406,23 @@ class Api:
             return {}
         return self._safe(go)
 
+    @staticmethod
+    def _kapali_modeller():
+        """Ticari olmayan modeller, kullanıcı açıkça açmadıkça kapalı başlar (kurulunca kendiliğinden devreye girmez)."""
+        s = storage.load_settings()
+        kap = set(s.get("model_kapali", []))
+        acik = set(s.get("model_acik", []))
+        kap |= {k for k, m in models.MODELS.items() if m.get("ticari") is False and k not in acik}
+        return sorted(kap)
+
     def model_kapat(self, key, kapali):
         def go():
             s = storage.load_settings()
-            lst = set(s.get("model_kapali", []))
-            (lst.add if kapali else lst.discard)(key)
-            storage.update_settings({"model_kapali": sorted(lst)})
-            models.set_disabled(sorted(lst))
+            lst = set(s.get("model_kapali", [])); acik = set(s.get("model_acik", []))
+            if kapali: lst.add(key); acik.discard(key)
+            else: lst.discard(key); acik.add(key)
+            storage.update_settings({"model_kapali": sorted(lst), "model_acik": sorted(acik)})
+            models.set_disabled(self._kapali_modeller())
             return {}
         return self._safe(go)
 
