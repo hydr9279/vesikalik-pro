@@ -196,3 +196,16 @@ kbd{display:inline-block;min-width:24px;padding:2px 7px;border-radius:6px;border
 .modul-sayfa-onizleme{border-top:1px solid var(--cizgi);padding:8px 18px;background:var(--panel)}
 .modul-sayfa-onizleme img{height:150px;margin:4px 8px 0 0;border:1px solid var(--cizgi);background:#fff}
 .araclar.alt-y{top:64px;font-size:12.5px;gap:14px;padding:6px 12px}.araclar.alt-y label{display:flex;align-items:center;gap:8px;color:var(--soluk)}.araclar.alt-y input[type=range]{width:120px}
+
+/* ayar çubukları: kısa çubuk + ◄ ► hassas ayar okları */
+.kaydirici .cubuk{display:flex;align-items:center;gap:6px;padding-left:14px}
+.kaydirici .cubuk input[type=range]{flex:1;min-width:0}
+.kaydirici .ok{flex:none;width:24px;height:24px;border-radius:7px;border:1px solid var(--cizgi,#2c3340);background:transparent;color:var(--soluk);font-size:10px;line-height:1;cursor:pointer;padding:0}
+.kaydirici .ok:hover{color:var(--vurgu);border-color:var(--vurgu)}
+.kaydirici .ok:active{background:var(--vurgu);color:#000}
+.takas{flex:none;align-self:flex-end;width:34px;height:34px;border-radius:9px;border:1px solid var(--cizgi,#2c3340);background:transparent;color:var(--yazi);font-size:16px;cursor:pointer;margin:0 6px}
+.takas:hover{color:var(--vurgu);border-color:var(--vurgu)}
+.btn.tehlike{border-color:#a33;color:#ff8a80}.btn.tehlike:hover{background:#a33;color:#fff}
+.ornek-isaret{position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;border:2px solid #fff;background:rgba(255,190,80,.7);box-shadow:0 0 0 1px #000;pointer-events:none}
+.araclar{flex-wrap:wrap}
+.araclar.alt-y label,.araclar.alt-y .not{white-space:nowrap}

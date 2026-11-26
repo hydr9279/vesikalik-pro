@@ -12,6 +12,7 @@ import numpy as np
 from . import face as F
 from . import models
 from .formats import FORMATS, GRADIENTS, GRADIENT_DEFAULTS, SOLIDS, MM, photo_px
+from .finish import DEFAULT_PRO, DEFAULT_KESKIN, skin_sample_mask, portrait_smooth, clone_apply, unsharp
 from .imgutil import (imread_any, guided_filter, estimate_foreground, hex2bgr, apply_lut)
 from .log import log
 
@@ -22,7 +23,8 @@ DEFAULT_MATTE = {"model": "auto", "fon_ayikla": 60, "sac_detay": 70, "yumusaklik
 DEFAULT_RETOUCH = {"leke": 55, "yumusatma": 25, "doku": 70, "parlama": 40, "gozalti": 15, "goz_beyaz": 0,
                    "dis_beyaz": 0, "gozluk": 0, "pozlama": 0, "kontrast": 0, "sicaklik": 0, "oto_beyaz": True,
                    "stil": "", "stil_guc": 100, "spots": [], "geri_al": [],
-                   "koruma": 85, "guvenli": True, "fircalar": [], "koruma_fircalar": []}
+                   "koruma": 85, "guvenli": True, "fircalar": [], "koruma_fircalar": [],
+                   "pro": dict(DEFAULT_PRO), "klon": [], "keskin": dict(DEFAULT_KESKIN)}
 DEFAULT_GEOM = {"zoom": 1.0, "dx": 0.0, "dy": 0.0, "rot": 0.0, "duzlestir": True}
 DEFAULT_BG = {"tip": "auto", "renk": "#FFFFFF", "degrade": 1, "merkez_x": 0.5, "merkez_y": 0.38, "yayilma": 0.75,
               "sertlik": 1.3, "ic": None, "dis": None, "fon_aydinlat": 35, "fon_temizle": 60}
@@ -361,6 +363,20 @@ class Job:
             out = np.maximum(out, m)
         return out
 
+    def _auto_skin_samples(self):
+        """Ten örneği seçilmediyse yüz noktalarından otomatik örnek: yanaklar ve alın (piksel)."""
+        L = self.labels
+        out = []
+        for lbl in (F.SKIN,):
+            ys, xs = np.nonzero(L == lbl)
+            if len(xs) > 50:
+                for q in ((25, 50), (75, 50), (50, 20), (50, 70)):
+                    cx, cy = np.percentile(xs, q[0]), np.percentile(ys, q[1])
+                    d = (xs - cx) ** 2 + (ys - cy) ** 2
+                    i = int(np.argmin(d))
+                    out.append((float(xs[i]), float(ys[i])))
+        return out
+
     def _protect(self, img):
         """Rötuşun dokunmaması gereken ince detaylar: kirpik, kaş, dudak, burun delikleri, bıyık/sakal (1=korunur)."""
         p = self.retouch_params
@@ -537,12 +553,31 @@ class Job:
             hsv[..., 1] *= 1 - 0.5 * k * m
             hsv[..., 2] = np.minimum(255, hsv[..., 2] * (1 + 0.12 * k * m))
             f = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR).astype(np.float32)
+        # 6b) Gelişmiş portre rötuşu (ten örneklerine göre; korunan ince detaylara dokunmaz)
+        pro = {**DEFAULT_PRO, **(p.get("pro") or {})}
+        if pro.get("acik") and pro.get("miktar", 0) > 0:
+            prog(0.8, "Gelişmiş portre rötuşu")
+            u8 = np.clip(f, 0, 255).astype(np.uint8)
+            smp = [(x * Ww, y * Hh) for x, y in pro.get("ornekler", [])]
+            if not smp:
+                smp = self._auto_skin_samples()
+            sm = skin_sample_mask(u8, smp, iod, tol=float(pro.get("tolerans", 24))) if smp else skin_soft
+            wide = cv2.GaussianBlur(cv2.dilate(skin, np.ones((5, 5), np.uint8), iterations=max(1, int(iod * 0.03))).astype(np.float32), (0, 0), max(1.5, iod * 0.02))
+            msk = np.minimum(sm, wide) * (1 - prot) * (float(pro.get("yayilma", 100)) / 100.0)
+            f = portrait_smooth(u8, msk, iod, pro).astype(np.float32)
+        # 6c) Klon damgası
+        if p.get("klon"):
+            f = clone_apply(f, p["klon"], iod)
         if p.get("fircalar"):
             rs = self._stroke_mask(p["fircalar"])[..., None]
             f = f * (1 - rs) + self.W.astype(np.float32) * rs
         out = np.clip(f, 0, 255).astype(np.uint8)
         # 7) Işık ve renk (tüm görüntü)
         out = self._tone(out, p)
+        # 8) Keskinleştirme (Unsharp Mask)
+        ks = {**DEFAULT_KESKIN, **(p.get("keskin") or {})}
+        if ks.get("miktar", 0) > 0:
+            out = unsharp(out, ks, iod, skin_soft)
         self.Wr = out
         self._retouch_key = key
         self._fg_cache = None

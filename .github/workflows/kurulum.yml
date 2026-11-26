@@ -22,6 +22,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           if ("${{ matrix.varyant }}" -eq "NVIDIA") { pip install -r requirements_nvidia.txt } else { pip install -r requirements_directml.txt }
+      - name: Girdi bicimleri testi (HEIC)
+        shell: pwsh
+        run: python test/bicim_testi.py
       - name: Modelleri indir
         shell: pwsh
         run: ./modelleri_indir.ps1
@@ -31,7 +34,7 @@ jobs:
           $extra = @()
           if ("${{ matrix.varyant }}" -eq "NVIDIA") { $extra += @("--collect-binaries","nvidia") }
           pyinstaller --noconfirm --clean --windowed --name VesikalikPro --icon ui/assets/app_icon.ico `
-            --add-data "ui;ui" --collect-all onnxruntime --collect-all webview @extra `
+            --add-data "ui;ui" --collect-all onnxruntime --collect-all webview --collect-all pillow_heif --collect-all rawpy @extra `
             --hidden-import win32print --hidden-import win32ui --hidden-import win32gui app.py
           Copy-Item -Recurse -Force models dist/VesikalikPro/models
       - name: Kurulum dosyasi (Inno Setup)

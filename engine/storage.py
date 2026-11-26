@@ -78,6 +78,24 @@ def check_admin(pw: str) -> bool:
     return secrets.compare_digest(_hash(pw or "", y["tuz"]), y["ozet"])
 
 
+def reset_archive(ad: str, pw: str) -> int:
+    """Arşiv ve günlük rapor kayıtlarını sıfırlar (yönetici adı + şifre gerekir). Silmeden önce yedek alır.
+    Arşiv numarası sayacı korunur (numaralar tekrar etmesin). Silinen kayıt sayısını döndürür."""
+    y = load_settings()["yonetici"]
+    if (ad or "").strip().casefold() != str(y["ad"]).casefold() or not check_admin(pw):
+        raise PermissionError("Yönetici adı veya şifresi hatalı.")
+    n = 0
+    if os.path.exists(ARCHIVE_FILE):
+        with open(ARCHIVE_FILE, "r", encoding="utf-8") as f:
+            n = sum(1 for ln in f if ln.strip())
+        if n:
+            import shutil, datetime
+            yedek = os.path.join(data_dir(), f"arsiv_yedek_{datetime.datetime.now():%Y%m%d_%H%M%S}.jsonl")
+            shutil.copy2(ARCHIVE_FILE, yedek)
+        open(ARCHIVE_FILE, "w", encoding="utf-8").close()
+    return n
+
+
 def update_settings(changes: dict, pw: str = "") -> dict:
     s = load_settings()
     if any(k in PROTECTED for k in changes) and not check_admin(pw):

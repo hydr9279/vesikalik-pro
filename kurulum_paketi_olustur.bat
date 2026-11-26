@@ -5,7 +5,7 @@ if not exist .venv ( echo Once kurulum.bat calistirilmali. & pause & exit /b 1 )
 call .venv\Scripts\activate.bat
 echo [1/2] Program derleniyor (PyInstaller)...
 pyinstaller --noconfirm --clean --windowed --name "VesikalikPro" --icon ui\assets\app_icon.ico ^
-  --add-data "ui;ui" --collect-all onnxruntime --collect-all webview --collect-binaries nvidia ^
+  --add-data "ui;ui" --collect-all onnxruntime --collect-all webview --collect-all pillow_heif --collect-all rawpy --collect-binaries nvidia ^
   --hidden-import win32print --hidden-import win32ui --hidden-import win32gui app.py
 if errorlevel 1 ( echo [HATA] Derleme basarisiz. & pause & exit /b 1 )
 xcopy /E /I /Y models dist\VesikalikPro\models >nul

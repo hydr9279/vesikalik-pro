@@ -17,7 +17,7 @@ window.onerror = (m, s, l) => { try { api.log_js_error(`${m} @${l}`); } catch (e
 const ADIMLAR = ["Başlangıç", "Arka Plan", "Rötuş", "Ölçekleme", "Baskı ve Kayıt"];
 const S = {
   init: null, fmt: {}, fid: "bio56", adim: 0, isler: [], cur: null, st: null, gorunum: "sonuc", arac: "sam+",
-  firca: 40, bilgi: {musteri: "", no: "", adet: 4}, ayar: {}, karsilastir: 50, lekeArac: false, sayfa: null, rArac: "k", rVal: 70, rGor: "sonuc", seciliLeke: -1,
+  firca: 40, bilgi: {musteri: "", no: "", adet: 4}, ayar: {}, karsilastir: 50, lekeArac: false, sayfa: null, rArac: "k", rVal: 70, kHard: 40, kVal: 100, kSrc: null, rGor: "sonuc", seciliLeke: -1,
 };
 
 // ------------------------------------------------------------------ meşgul / ilerleme
@@ -239,7 +239,7 @@ function girisCiz(sh) {
   $("#kPol", mod).onclick = () => modulAc("polaroid");
   $("#kSer", mod).onclick = () => modulAc("serbest");
   g.append(mod);
-  const b = h(`<div class="birak"><span class="daire"><svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg></span><b style="color:var(--yazi);font-size:15px">Fotoğrafları buraya bırakın</b><span>JPG, PNG, TIFF · Klasör de bırakabilirsiniz</span><div class="satir"><button class="btn kucuk" id="bDosya">Dosya seç</button><button class="btn kucuk" id="bKlasor">Klasör seç</button></div></div>`);
+  const b = h(`<div class="birak"><span class="daire"><svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg></span><b style="color:var(--yazi);font-size:15px">Fotoğrafları buraya bırakın</b><span>JPG, PNG, HEIC, WebP, TIFF, RAW · Klasör de bırakabilirsiniz</span><div class="satir"><button class="btn kucuk" id="bDosya">Dosya seç</button><button class="btn kucuk" id="bKlasor">Klasör seç</button></div></div>`);
   $("#bDosya", b).onclick = dosyaEkle;
   $("#bKlasor", b).onclick = async () => { const k = await api.pick_folder(); if (k) yollaEkle([k]); };
   g.append(b);
@@ -371,11 +371,12 @@ function rotusTuval(sh, alan, ic, kat, norm, ana) {
   const A = S.rArac || "k";
   const T = (k, ad, ip) => `<button class="arac ${A === k ? "secili" : ""}" data-a="${k}" title="${ip}">${ad}</button>`;
   const fs = S.st.firca_sayisi || [0, 0];
-  const ar = h(`<div class="araclar">${T("k", "Karşılaştır", "Önce / sonra sürgüsü")}${T("l", "Leke fırçası", "Tıklanan yeri leke olarak temizler (L)")}${T("g", "Geri al fırçası", "Rötuşu fırçayla yüzdelik olarak siler, orijinale döndürür (G)")}${T("p", "Koruma fırçası", "Fırçayla boyanan yer rötuştan korunur (P)")}<span class="arac-ayrac"></span><button class="arac ${S.lekeGoster ? "secili" : ""}" data-a="x" title="Bulunan lekeleri göster/gizle">Lekeleri göster</button><button class="arac ${S.rGor === "koruma" ? "secili" : ""}" data-a="v" title="Rötuşun dokunmadığı bölgeleri yeşil gösterir (K)">Koruma haritası</button><button class="arac" data-a="u" title="Son fırça darbesini geri al">↶ Fırça geri al</button></div>`);
+  const ar = h(`<div class="araclar">${T("k", "Karşılaştır", "Önce / sonra sürgüsü")}${T("l", "Leke fırçası", "Tıklanan yeri leke olarak temizler (L)")}${T("g", "Geri al fırçası", "Rötuşu fırçayla yüzdelik olarak siler, orijinale döndürür (G)")}${T("p", "Koruma fırçası", "Fırçayla boyanan yer rötuştan korunur (P)")}${T("n", "Klon damgası", "Alt + tıkla: kaynak seç, sonra boyayarak kopyala (S)")}${T("t", "Ten örneği", "Gelişmiş portre rötuşu için ten rengi örneği seç (T)")}<span class="arac-ayrac"></span><button class="arac ${S.lekeGoster ? "secili" : ""}" data-a="x" title="Bulunan lekeleri göster/gizle">Lekeleri göster</button><button class="arac ${S.rGor === "koruma" ? "secili" : ""}" data-a="v" title="Rötuşun dokunmadığı bölgeleri yeşil gösterir (K)">Koruma haritası</button><button class="arac" data-a="u" title="Son fırça darbesini geri al">↶ Fırça geri al</button><button class="arac" data-a="uk" title="Son klon darbesini geri al">↶ Klon geri al${S.st.klon_sayisi ? " (" + S.st.klon_sayisi + ")" : ""}</button></div>`);
   $$(".arac", ar).forEach(b => b.onclick = async () => {
     const a = b.dataset.a;
     if (a === "x") S.lekeGoster = !S.lekeGoster;
     else if (a === "v") { S.rGor = S.rGor === "koruma" ? "sonuc" : "koruma"; S.st.gorsel_koruma = null; }
+    else if (a === "uk") { const r = await cagir("klon_geri_al", S.cur, S.fid); if (r.ok) { S.st = {...r, gorsel_once: S.st.gorsel_once}; } }
     else if (a === "u") { const t = (S.rArac === "p") ? "koru" : "geri"; const r = await cagir("rotus_firca_geri_al", S.cur, S.fid, t); if (r.ok) { S.st = {...r, gorsel_once: S.st.gorsel_once}; } }
     else S.rArac = a;
     sahneCiz();
@@ -387,6 +388,15 @@ function rotusTuval(sh, alan, ic, kat, norm, ana) {
     if ($("#rfv", ab)) $("#rfv", ab).oninput = (e) => { S.rVal = +e.target.value; $("b", e.target.parentNode).textContent = "%" + S.rVal; };
     sh.append(ab);
   }
+  if (A === "n") {
+    const nb = h(`<div class="araclar alt-y"><label>Fırça boyutu <input type="range" min="6" max="200" value="${S.firca}" id="nfb"> <b>${S.firca}</b></label><label>Kenar yumuşaklığı <input type="range" min="0" max="100" value="${100 - S.kHard}" id="nfy"> <b>%${100 - S.kHard}</b></label><label>Opaklık <input type="range" min="5" max="100" value="${S.kVal}" id="nfo"> <b>%${S.kVal}</b></label><span class="not" style="margin:0">${S.kSrc ? "Kaynak seçili ✓" : "Önce <b>Alt + tıkla</b> ile kaynağı seçin"}</span></div>`);
+    $("#nfb", nb).oninput = (e) => { S.firca = +e.target.value; $("b", e.target.parentNode).textContent = S.firca; };
+    $("#nfy", nb).oninput = (e) => { S.kHard = 100 - +e.target.value; $("b", e.target.parentNode).textContent = "%" + e.target.value; };
+    $("#nfo", nb).oninput = (e) => { S.kVal = +e.target.value; $("b", e.target.parentNode).textContent = "%" + S.kVal; };
+    sh.append(nb);
+  }
+  if (A === "t") sh.append(h(`<div class="araclar alt-y"><span class="not" style="margin:0">Yüzde <b>ten renginde</b> 1-4 noktaya tıklayın (yanak, alın). Gelişmiş yumuşatma yalnız bu renge benzeyen yerlere uygulanır.</span></div>`));
+  (S.st.pro_ornekler || []).forEach(([x, y]) => kat.append(h(`<span class="ornek-isaret" style="left:${x * 100}%;top:${y * 100}%"></span>`)));
   if (S.rGor === "koruma") {
     if (!S.st.gorsel_koruma) cagir("view", S.cur, S.fid, "koruma").then(r => { if (r.ok) { S.st.gorsel_koruma = r.gorsel; sahneCiz(); } });
     else ana.src = S.st.gorsel_koruma;
@@ -418,8 +428,14 @@ function rotusTuval(sh, alan, ic, kat, norm, ana) {
     const r = await cagir("spot", S.cur, S.fid, x, y);
     if (r.ok) guncelle(r);
   });
-  // geri al / koruma fırçaları
-  if (A === "g" || A === "p") {
+  if (A === "t") alan.addEventListener("mousedown", async (e) => {
+    if (e.button !== 0 || bosluk) return;
+    const [x, y] = norm(e);
+    const r = await cagir("pro_ornek", S.cur, S.fid, x, y);
+    if (r.ok) guncelle(r);
+  });
+  // geri al / koruma / klon fırçaları
+  if (A === "g" || A === "p" || A === "n") {
     let cizim = null;
     const im = h(`<div class="firca-imlec" style="display:none"></div>`); alan.append(im);
     alan.addEventListener("mousemove", (e) => {
@@ -429,12 +445,14 @@ function rotusTuval(sh, alan, ic, kat, norm, ana) {
     });
     alan.addEventListener("mousedown", (e) => {
       if (e.button !== 0 || bosluk) return;
+      if (A === "n" && e.altKey) { S.kSrc = norm(e); S.kOfs = null; bildir("Klon kaynağı seçildi"); panelCiz(); sahneCiz(); return; }
+      if (A === "n" && !S.kSrc) { bildir("Önce Alt + tıklayarak kaynağı seçin"); return; }
       const svg = document.createElementNS(svgNS, "svg"); svg.setAttribute("viewBox", "0 0 1000 1000"); svg.setAttribute("preserveAspectRatio", "none");
       Object.assign(svg.style, {position: "absolute", inset: 0, width: "100%", height: "100%", overflow: "visible", pointerEvents: "none"});
       const path = document.createElementNS(svgNS, "path"); const [x, y] = norm(e);
       path.setAttribute("d", `M${x * 1000} ${y * 1000}`);
       const rr = ic.getBoundingClientRect();
-      path.setAttribute("stroke", A === "g" ? "rgba(255,190,80,.55)" : "rgba(61,214,140,.55)");
+      path.setAttribute("stroke", A === "g" ? "rgba(255,190,80,.55)" : A === "n" ? "rgba(120,170,255,.5)" : "rgba(61,214,140,.55)");
       path.setAttribute("stroke-width", S.firca / rr.width * 1000); path.setAttribute("fill", "none"); path.setAttribute("stroke-linecap", "round"); path.setAttribute("stroke-linejoin", "round");
       svg.append(path); kat.append(svg);
       cizim = {pts: [[x, y]], path, w: rr.width};
@@ -442,6 +460,13 @@ function rotusTuval(sh, alan, ic, kat, norm, ana) {
     alan.addEventListener("mouseup", async () => {
       if (!cizim) return;
       const c = cizim; cizim = null;
+      if (A === "n") {
+        if (!S.kOfs) S.kOfs = [S.kSrc[0] - c.pts[0][0], S.kSrc[1] - c.pts[0][1]];   // hizalı: kaynak–hedef farkı vuruşlar arasında sabit
+        const k0 = [c.pts[0][0] + S.kOfs[0], c.pts[0][1] + S.kOfs[1]];
+        const r = await cagir("klon_firca", S.cur, S.fid, {pts: c.pts, src: k0, r: S.firca / 2 / c.w, val: S.kVal / 100, hard: S.kHard / 100});
+        if (r.ok) guncelle(r);
+        return;
+      }
       const r = await cagir("rotus_firca", S.cur, S.fid, {pts: c.pts, r: S.firca / 2 / c.w, val: A === "g" ? S.rVal / 100 : 1, tur: A === "g" ? "geri" : "koru", hard: 0.4});
       if (r.ok) guncelle(r);
     });
@@ -530,10 +555,27 @@ function baskiCiz(sh) {
 
 // ------------------------------------------------------------------ panel
 function kaydirici(ad, etiket, deger, min, max, adim, birim, degisti, bilgi = "") {
-  const e = h(`<div class="kaydirici" title="${esc(bilgi)}"><div class="ust-s"><label for="k_${ad}">${etiket}</label><span class="deger">${deger}${birim}</span></div><input id="k_${ad}" type="range" min="${min}" max="${max}" step="${adim}" value="${deger}"></div>`);
-  const inp = $("input", e);
+  const e = h(`<div class="kaydirici" title="${esc(bilgi)}"><div class="ust-s"><label for="k_${ad}">${etiket}</label><span class="deger">${deger}${birim}</span></div><div class="cubuk"><button type="button" class="ok" aria-label="Azalt">◄</button><input id="k_${ad}" type="range" min="${min}" max="${max}" step="${adim}" value="${deger}"><button type="button" class="ok" aria-label="Artır">►</button></div></div>`);
+  const inp = $("input", e), [sol, sag] = $$("button.ok", e);
+  const nd = (adim + "").includes(".") ? (adim + "").split(".")[1].length : 0;
   inp.oninput = () => $(".deger", e).textContent = inp.value + birim;
   inp.onchange = () => degisti(+inp.value);
+  // ok düğmeleri: tek tık = bir adım, basılı tutunca tekrar, Shift = 10 adım; art arda basışlar tek işleme birleşir
+  let bekle = null;
+  const git = (yon, ev) => {
+    const kat = ev && ev.shiftKey ? 10 : 1;
+    let v = +inp.value + yon * adim * kat;
+    v = Math.min(+max, Math.max(+min, +v.toFixed(nd)));
+    inp.value = v; $(".deger", e).textContent = inp.value + birim;
+    clearTimeout(bekle); bekle = setTimeout(() => degisti(+inp.value), 350);
+  };
+  [[sol, -1], [sag, 1]].forEach(([b, yon]) => {
+    let t1 = null, t2 = null;
+    const dur = () => { clearTimeout(t1); clearInterval(t2); };
+    b.onpointerdown = (ev) => { ev.preventDefault(); git(yon, ev); t1 = setTimeout(() => { t2 = setInterval(() => git(yon, ev), 70); }, 400); };
+    b.onpointerup = b.onpointerleave = b.onpointercancel = dur;
+    b.onkeydown = (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); git(yon, ev); } };
+  });
   return e;
 }
 function bolum(baslik, sag = "") { return h(`<section class="bolum"><h3>${baslik}${sag}</h3></section>`); }
@@ -684,6 +726,9 @@ function fonPaneli(f) {
     const rk = h(`<div class="satir"><div class="alan" style="flex:1"><label>İç renk</label><input type="color" class="renk-sec" value="${bg.ic || cur.ic}"></div><div class="alan" style="flex:1"><label>Dış renk</label><input type="color" class="renk-sec" value="${bg.dis || cur.dis}"></div></div>`);
     const [ri, rd] = $$("input", rk);
     ri.onchange = () => set({ic: ri.value}); rd.onchange = () => set({dis: rd.value});
+    const tk = h(`<button type="button" class="takas" title="İç ve dış rengi değiştir" aria-label="İç ve dış rengi değiştir">⇄</button>`);
+    tk.onclick = () => { const a = ri.value; ri.value = rd.value; rd.value = a; set({ic: ri.value, dis: rd.value}); };
+    rk.insertBefore(tk, rk.children[1]);
     b.append(rk);
   } else {
     const rk = h(`<div class="satir"><input type="color" class="renk-sec" value="${bg.renk || "#FFFFFF"}" aria-label="Fon rengi"></div>`);
@@ -721,10 +766,37 @@ function panelRotus(p) {
   c.append(kaydirici("pa", "Parlama azaltma", r.parlama, 0, 100, 1, "", set("parlama")));
   c.append(kaydirici("ga", "Göz altı aydınlatma", r.gozalti, 0, 100, 1, "", set("gozalti")));
   p.append(c);
+  const sp = (k) => async (v) => { const x = await rotusUygula({pro: {...(S.st.rotus.pro || {}), [k]: v}}); if (x.ok) { sahneCiz(); panelCiz(); } };
+  const pro = r.pro || {};
+  const gp = bolum("GELİŞMİŞ PORTRE RÖTUŞU");
+  gp.append(secim("pa1", "Açık (ten örneğine göre profesyonel yumuşatma)", !!pro.acik, sp("acik"), "Imagenomic benzeri 3 ölçekli yumuşatma"));
+  if (pro.acik) {
+    gp.append(kaydirici("pm", "Genel miktar", pro.miktar ?? 60, 0, 100, 1, "", sp("miktar")));
+    gp.append(kaydirici("pi", "İnce gözenek", pro.ince ?? 4, 0, 10, 1, "", sp("ince")));
+    gp.append(kaydirici("po2", "Orta leke ve düzensizlik", pro.orta ?? 5, 0, 10, 1, "", sp("orta")));
+    gp.append(kaydirici("pk", "Kaba ton geçişi", pro.kaba ?? 3, 0, 10, 1, "", sp("kaba")));
+    gp.append(kaydirici("pe", "Detay koruma eşiği", pro.esik ?? 55, 10, 100, 1, "", sp("esik"), "Yüksek: belirgin çizgiler (kırışık, kaş) korunur"));
+    gp.append(kaydirici("pt", "Ten benzerliği toleransı", pro.tolerans ?? 24, 8, 60, 1, "", sp("tolerans"), "Seçilen ten örneğine ne kadar benzeyen yerler etkilensin"));
+    gp.append(kaydirici("py", "Etki alanı", pro.yayilma ?? 100, 0, 100, 1, "%", sp("yayilma")));
+    const gb = h(`<div class="satir"><button class="btn kucuk">Ten örneği seç</button><button class="btn kucuk">Örnekleri temizle (${(S.st.pro_ornekler || []).length})</button></div>`);
+    const [b1, b2] = $$("button", gb);
+    b1.onclick = () => { S.rArac = "t"; sahneCiz(); };
+    b2.onclick = async () => { const x = await cagir("pro_ornek", S.cur, S.fid, null, null, true); if (x.ok) { S.st = {...x, gorsel_once: S.st.gorsel_once}; sahneCiz(); panelCiz(); } };
+    gp.append(gb);
+  }
+  p.append(gp);
+  const ks = r.keskin || {};
+  const sk = (k) => async (v) => { const x = await rotusUygula({keskin: {...(S.st.rotus.keskin || {}), [k]: v}}); if (x.ok) { sahneCiz(); panelCiz(); } };
+  const gk = bolum("KESKİNLEŞTİRME (Unsharp Mask)");
+  gk.append(kaydirici("km", "Miktar", ks.miktar ?? 50, 0, 150, 1, "%", sk("miktar")));
+  gk.append(kaydirici("kya", "Yarıçap", ks.yaricap ?? 1.0, 0.3, 5, 0.1, " px", sk("yaricap")));
+  gk.append(kaydirici("ke", "Eşik", ks.esik ?? 0, 0, 20, 1, "", sk("esik"), "Düşük kontrastlı yerleri (gürültü, cilt) keskinleştirme"));
+  gk.append(secim("kc", "Cildi koru (yüzde daha az keskinlik)", ks.cilt_koru !== false, sk("cilt_koru")));
+  p.append(gk);
   const kb = bolum("DETAY KORUMA");
   kb.append(kaydirici("kr", "Koruma gücü (kirpik, kaş, bıyık, sakal, burun delikleri)", r.koruma, 0, 100, 1, "", set("koruma"), "Bu bölgelere rötuş dokunmaz. Yeşil harita için K tuşu"));
   kb.append(secim("gv", "Güvenli sınır (kişiye ait kırışık/ben/sakal korunur)", r.guvenli, set("guvenli")));
-  kb.append(h(`<div class="not">Fırçalar: <b>G</b> geri al (yüzdelik), <b>P</b> koru, <b>L</b> leke. Leke işaretini silmek için tıklayıp <b>Delete</b> veya sağ tık.</div>`));
+  kb.append(h(`<div class="not">Fırçalar: <b>G</b> geri al (yüzdelik), <b>P</b> koru, <b>L</b> leke, <b>S</b> klon, <b>T</b> ten örneği. Leke işaretini silmek için tıklayıp <b>Delete</b> veya sağ tık.</div>`));
   p.append(kb);
   const gd = bolum("GÖZ VE DİŞ");
   if (f.grup === "vesikalik") {
@@ -963,7 +1035,28 @@ async function arsiv(sekme = "arsiv", q = "") {
     Object.entries(r.turler).forEach(([k, v]) => $("tbody", t).append(h(`<tr><td>${esc(k)}</td><td>${v.is}</td><td>${v.adet}</td><td>${v.baski}</td></tr>`)));
     g.append(t);
   }
+  const alt = h(`<div class="satir" style="justify-content:flex-end;margin-top:12px"><button class="btn tehlike">Arşivi ve raporu sıfırla…</button></div>`);
+  $("button", alt).onclick = () => arsivSifirla();
+  ic.append(alt);
   modal("Arşiv ve rapor", ic, true);
+}
+
+function arsivSifirla() {
+  const ic = h(`<div class="modal-ic"><div class="not">Müşteri arşivi ve günlük rapor kayıtları <b>silinir</b>. Güvenlik için silmeden önce bilgisayarda yedek dosyası alınır. Arşiv numarası kaldığı yerden devam eder. Devam etmek için yönetici adı ve şifresi gerekir.</div>
+    <div class="alan"><label>Yönetici adı</label><input type="text" id="sAd" autocomplete="off"></div>
+    <div class="alan"><label>Yönetici şifresi</label><input type="password" id="sPw" autocomplete="off"></div>
+    <div class="not" id="sHata" style="color:#ff8a80"></div>
+    <div class="satir" style="justify-content:flex-end"><button class="btn">Vazgeç</button><button class="btn tehlike">Sıfırla</button></div></div>`);
+  const [v, t] = $$("button", ic);
+  v.onclick = () => arsiv();
+  t.onclick = async () => {
+    const r = await api.arsiv_sifirla($("#sAd", ic).value, $("#sPw", ic).value);
+    if (r.ok) { kapat(); bildir(r.silinen ? `${r.silinen} kayıt silindi (yedek alındı)` : "Silinecek kayıt yoktu"); }
+    else $("#sHata", ic).textContent = r.hata || "İşlem yapılamadı";
+  };
+  $("#sPw", ic).onkeydown = (e) => { if (e.key === "Enter") t.click(); };
+  modal("Arşivi sıfırla", ic);
+  setTimeout(() => $("#sAd", ic).focus(), 50);
 }
 
 function hakkinda() {
@@ -1073,7 +1166,7 @@ document.addEventListener("keydown", (e) => {
   }
   if (S.adim === 2) {
     const kk = k.toLowerCase();
-    const m = {l: "l", g: "g", p: "p", c: "k"}[kk];
+    const m = {l: "l", g: "g", p: "p", c: "k", s: "n", t: "t"}[kk];
     if (m) { S.rArac = (S.rArac === m && m !== "k") ? "k" : m; sahneCiz(); }
     if (kk === "k") { S.rGor = S.rGor === "koruma" ? "sonuc" : "koruma"; S.st.gorsel_koruma = null; sahneCiz(); }
     if (k === "Delete" || k === "Backspace") { e.preventDefault(); S.silLeke && S.silLeke(); }

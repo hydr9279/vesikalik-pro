@@ -16,7 +16,7 @@ import numpy as np
 
 from . import extras, models, printing, storage
 from .formats import FORMATS, GRADIENTS, public_formats, photo_px
-from .imgutil import imread_any, save_jpeg, to_b64, learn_lut
+from .imgutil import imread_any, save_jpeg, to_b64, learn_lut, is_image, IMG_EXTS
 from .job import Job, save_style, list_styles, DEFAULT_RETOUCH, DEFAULT_MATTE, DEFAULT_BG, DEFAULT_GEOM
 from .layout import sheet_for, test_page
 from .log import log, log_exc, log_dir
@@ -98,7 +98,8 @@ class Api:
         out["donanim"] = models.provider_info()["name"]
         out["model"] = getattr(j, "matte_model", "")
         out["matte"] = {k: v for k, v in j.matte_params.items()}
-        out["rotus"] = {k: v for k, v in j.retouch_params.items() if k not in ("spots", "geri_al", "fircalar", "koruma_fircalar")}
+        out["rotus"] = {k: v for k, v in j.retouch_params.items() if k not in ("spots", "geri_al", "fircalar", "koruma_fircalar", "klon")}
+        out["klon_sayisi"] = len(j.retouch_params.get("klon") or [])
         out["bg"] = dict(j.bg)
         out["geom"] = dict(j.geom)
         out["duzeltme_sayisi"] = len(j.edits)
@@ -116,6 +117,11 @@ class Api:
                     continue  # fotoğraf karesinin dışında kalan bölge
                 boxes.append({"ad": b["ad"], "x": cx0, "y": cy0, "w": cx1 - cx0, "h": cy1 - cy0})
             out["supheli"] = boxes
+            po = []
+            for wx, wy in (j.retouch_params.get("pro") or {}).get("ornekler", []):
+                q = M[:, :2] @ np.array([wx * W, wy * H]) + M[:, 2]
+                po.append([q[0] / Wc, q[1] / Hc])
+            out["pro_ornekler"] = po
             spots = []
             for sx, sy in j.spots_found:
                 p = M[:, :2] @ np.array([sx * W, sy * H]) + M[:, 2]
@@ -144,7 +150,7 @@ class Api:
             return []
         import webview
         r = self.window.create_file_dialog(webview.OPEN_DIALOG, allow_multiple=True,
-                                           file_types=("Fotoğraflar (*.jpg;*.jpeg;*.png;*.tif;*.tiff;*.JPG;*.JPEG)", "Tüm dosyalar (*.*)"))
+                                           file_types=("Fotoğraflar (" + ";".join("*" + e for e in IMG_EXTS) + ")", "Tüm dosyalar (*.*)"))
         return list(r or [])
 
     def pick_folder(self, start=""):
@@ -156,7 +162,7 @@ class Api:
 
     def add_files(self, paths):
         out = []
-        exts = (".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp")
+        exts = IMG_EXTS
         for p in paths:
             if os.path.isdir(p):
                 paths += [os.path.join(p, f) for f in sorted(os.listdir(p))]
@@ -295,8 +301,10 @@ class Api:
         def go():
             j = self.jobs[jid]
             p = dict(params)
-            for k in ("spots", "geri_al", "fircalar", "koruma_fircalar"):
+            for k in ("spots", "geri_al", "fircalar", "koruma_fircalar", "klon", "pro_ornekler"):
                 p.pop(k, None)
+            if "pro" in p:   # örnek noktaları motorda tutulur; arayüz yalnız ayarları gönderir
+                p["pro"] = {**(p["pro"] or {}), "ornekler": (j.retouch_params.get("pro") or {}).get("ornekler", [])}
             j.retouch_params.update(p)
             j.retouch(self._p)
             self._p(0.95, "Görüntü hazırlanıyor")
@@ -316,6 +324,49 @@ class Api:
             key = "koruma_fircalar" if e.get("tur") == "koru" else "fircalar"
             j.retouch_params.setdefault(key, []).append({"pts": pts, "r": r, "val": float(e.get("val", 1.0)), "hard": float(e.get("hard", 0.4))})
             self._p(0.4, "Fırça uygulanıyor")
+            j.retouch(self._p)
+            return self._state(j, fid)
+        return self._safe(go)
+
+    def klon_firca(self, jid, fid, e):
+        """Klon damgası. e: {pts, src:[x,y], r, hard, val} — önizleme koordinatları (0..1)."""
+        def go():
+            j = self.jobs[jid]
+            pts = []
+            for px, py in e["pts"]:
+                x, y, s = self._to_work(j, fid, px, py)
+                pts.append((x, y))
+            sx, sy, _ = self._to_work(j, fid, e["src"][0], e["src"][1])
+            M, (Wc, Hc), ppm, s = j.transform(self._fmt(fid), EDIT_MULT)
+            r = e["r"] * Wc / s / j.W.shape[1]
+            j.retouch_params.setdefault("klon", []).append({"pts": pts, "src": [sx, sy], "r": r,
+                                                           "val": float(e.get("val", 1.0)), "hard": float(e.get("hard", 0.4))})
+            self._p(0.4, "Klon damgası uygulanıyor")
+            j.retouch(self._p)
+            return self._state(j, fid)
+        return self._safe(go)
+
+    def klon_geri_al(self, jid, fid, hepsi=False):
+        def go():
+            j = self.jobs[jid]
+            k = j.retouch_params.get("klon") or []
+            if hepsi: k.clear()
+            elif k: k.pop()
+            j.retouch(self._p)
+            return self._state(j, fid)
+        return self._safe(go)
+
+    def pro_ornek(self, jid, fid, x=None, y=None, temizle=False):
+        """Gelişmiş portre rötuşu için ten örneği ekler (önizleme koordinatı) ya da temizler."""
+        def go():
+            j = self.jobs[jid]
+            pro = j.retouch_params.setdefault("pro", {})
+            lst = pro.setdefault("ornekler", [])
+            if temizle: lst.clear()
+            elif x is not None:
+                wx, wy, _ = self._to_work(j, fid, x, y)
+                if len(lst) < 6: lst.append([wx, wy])
+            pro["acik"] = True
             j.retouch(self._p)
             return self._state(j, fid)
         return self._safe(go)
@@ -490,6 +541,9 @@ class Api:
     def update_settings(self, changes, pw=""):
         return self._safe(lambda: {"ayarlar": (storage.update_settings(changes, pw), storage.public_settings())[1]})
 
+    def arsiv_sifirla(self, ad, pw):
+        return self._safe(lambda: {"silinen": storage.reset_archive(ad, pw)})
+
     def check_admin(self, pw):
         return {"ok": storage.check_admin(pw)}
 
@@ -511,7 +565,7 @@ class Api:
         for p in paths:
             if os.path.isdir(p):
                 paths += [os.path.join(p, f) for f in sorted(os.listdir(p))]
-            elif p.lower().endswith((".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp")):
+            elif is_image(p):
                 out.append({"yol": p, "ad": os.path.basename(p)})
         return out
 
@@ -712,7 +766,7 @@ class Api:
         d = s.get("kamera_klasoru")
         if not (s.get("kamera_izle") and d and os.path.isdir(d)):
             return {"yeni": []}
-        exts = (".jpg", ".jpeg", ".png", ".tif", ".tiff")
+        exts = IMG_EXTS
         now = {os.path.join(d, f) for f in os.listdir(d) if f.lower().endswith(exts)}
         if getattr(self, "_cam_dir", None) != d:
             self._cam_dir, self._cam_seen = d, now

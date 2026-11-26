@@ -11,10 +11,60 @@ from PIL import Image, ImageOps
 from .formats import DPI
 
 
+# Desteklenen girdi biçimleri (JPG, PNG, TIFF, WebP, JFIF, HEIC/HEIF, AVIF, BMP ve kamera RAW)
+RAW_EXTS = (".nef", ".nrw", ".dng", ".cr2", ".cr3", ".arw", ".orf", ".rw2", ".raf", ".pef", ".srw")
+IMG_EXTS = (".jpg", ".jpeg", ".jfif", ".jpe", ".png", ".tif", ".tiff", ".bmp", ".webp",
+            ".heic", ".heif", ".avif") + RAW_EXTS
+_HEIF_OK = None
+
+
+def _heif():
+    global _HEIF_OK
+    if _HEIF_OK is None:
+        try:
+            import pillow_heif
+            pillow_heif.register_heif_opener()
+            try:
+                pillow_heif.register_avif_opener()
+            except Exception:
+                pass
+            _HEIF_OK = True
+        except Exception:
+            _HEIF_OK = False
+    return _HEIF_OK
+
+
+def is_image(name: str) -> bool:
+    return str(name).lower().endswith(IMG_EXTS)
+
+
+def _open_any(path: str) -> Image.Image:
+    low = path.lower()
+    if low.endswith(RAW_EXTS):
+        import rawpy
+        with rawpy.imread(path) as raw:
+            rgb = raw.postprocess(use_camera_wb=True, no_auto_bright=False, output_bps=8, half_size=False)
+        return Image.fromarray(rgb)
+    if low.endswith((".heic", ".heif", ".avif")):
+        if not _heif():
+            raise RuntimeError("HEIC/AVIF desteği yüklenemedi (pillow-heif).")
+    else:
+        _heif()
+    return Image.open(path)
+
+
 def imread_any(path: str) -> np.ndarray:
-    """Türkçe karakterli yol + EXIF yönü + renk profili (sRGB'ye çevirir). BGR uint8."""
-    im = Image.open(path)
+    """Türkçe karakterli yol + EXIF yönü + renk profili (sRGB'ye çevirir) + şeffaflık (beyaza). BGR uint8."""
+    im = _open_any(path)
     im = ImageOps.exif_transpose(im)
+    if im.mode in ("RGBA", "LA", "PA") or (im.mode == "P" and "transparency" in im.info):
+        rgba = im.convert("RGBA")
+        zemin = Image.new("RGBA", rgba.size, (255, 255, 255, 255))
+        im = Image.alpha_composite(zemin, rgba).convert("RGB")
+    elif im.mode in ("I;16", "I;16B", "I", "F"):
+        a = np.asarray(im).astype(np.float32)
+        a = a / (a.max() or 1) * 255
+        im = Image.fromarray(a.astype(np.uint8)).convert("RGB")
     icc = im.info.get("icc_profile")
     if icc:
         try:
