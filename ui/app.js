@@ -1170,8 +1170,10 @@ function hakkinda() {
     <div style="font-weight:700;letter-spacing:.03em">HAYDAR ALTINSABAN yapımıdır · Tüm hakları saklıdır</div>
     <div class="not">HAYAL MEDYA · 0312 264 0 888 &nbsp;·&nbsp; Haydar Altınsaban · 0554 990 49 59</div></div>
     <div class="modal-ic">
-    <h3 style="margin:0;font-size:13px;color:var(--soluk);letter-spacing:.08em">SÜRÜM NOTLARI · 1.4</h3>
+    <h3 style="margin:0;font-size:13px;color:var(--soluk);letter-spacing:.08em">SÜRÜM NOTLARI · 1.4.2</h3>
     <ul class="not" style="margin:0;padding-left:18px;line-height:1.7;color:var(--yazi)">
+      <li><b>Yeni (1.4.2):</b> Manuel rötuşta Photoshop tarzı Yama (serbest çizim seçim, Kaynak/Hedef, Yayılım), sağ tıkla fırça boyutu ve sertlik penceresi, Akış ayarı; yeni araçlar: İyileştirme fırçası, Orijinale döndür, Parlama gider, Aydınlat, Karart, Göz/diş beyazlat, küçük harita.</li>
+      <li><b>Yeni (1.4.2):</b> Açılış ekranında durum yazısı; yükleme ekranı ayrı işlemde çalışır, açılışta donma giderildi.</li>
       <li><b>Yeni (1.4):</b> Açılış animasyonu ve tek pencere kilidi: çift tıklayınca hemen yükleniyor penceresi görünür, tekrar tıklamak gerekmez, uygulama bir kez açılır.</li>
       <li><b>Yeni (1.4):</b> Manuel rötuş ekranı (klon damgası, yama, nokta iyileştirme, cilt yumuşatma) ve manuel dekupe · saç ekranı (saç fırçası, ekle, sil, yumuşat, keskinleştir, daralt, genişlet). Her vuruş anında görünür.</li>
       <li><b>Yeni (1.4):</b> Sade, yana kaydırılabilir araç çubukları ve fareyle ipucu balonları; vesikalık baskıda "Sayfa kopyası" kaldırıldı.</li>

@@ -2,6 +2,12 @@
 HAYDAR ALTINSABAN yapımıdır · Tüm hakları saklıdır
 HAYAL MEDYA · 0312 264 0 888 · Haydar Altınsaban · 0554 990 49 59
 
+SÜRÜM 1.4.2
+- Manuel rötuş: Photoshop tarzı Yama (serbest çizimle seçim, yürüyen çizgi, Kaynak/Hedef, Yayılım, canlı önizleme)
+- Fırça boyutu ve sertlik fotoğraf üzerinde sağ tıkla açılan pencerede (önizlemeli); üst çubukta Opaklık ve Akış
+- Yeni manuel araçlar: İyileştirme fırçası, Orijinale döndür, Parlama gider, Aydınlat, Karart, Göz/diş beyazlat; yakınlaştırma için küçük harita
+- Açılış ekranında gerçek durum yazısı; açılış aşamaları günlüğe süreleriyle yazılır
+
 SÜRÜM 1.4.1
 - Açılışta "yanıt vermiyor" sorunu giderildi: yükleme ekranı artık ayrı işlemde çalışır ve uygulama görününce hemen kapanır; yazıcı listesi en çok 3 sn beklenir
 

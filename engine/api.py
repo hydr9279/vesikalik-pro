@@ -154,16 +154,24 @@ class Api:
         return out["v"]
 
     def init(self):
+        _t = time.time()
         try:
-            models.set_gpu(bool(storage.load_settings().get("gpu_kullan", True)))
-            models.set_disabled(storage.load_settings().get("model_kapali", []))
-        except Exception:
-            pass
-        s = storage.public_settings()
-        return {"surum": VERSION, "ad": APP_NAME, "formatlar": public_formats(), "degradeler": GRADIENTS,
-                "ayarlar": s, "stiller": list_styles(), "yazicilar": self._yazicilar(),
-                "varsayilanlar": {"rotus": DEFAULT_RETOUCH, "matte": DEFAULT_MATTE, "bg": DEFAULT_BG, "geom": DEFAULT_GEOM},
-                "modeller": {k: models.has_model(k) for k in models.MODELS}, "windows": printing.WIN}
+            try:
+                models.set_gpu(bool(storage.load_settings().get("gpu_kullan", True)))
+                models.set_disabled(storage.load_settings().get("model_kapali", []))
+            except Exception:
+                pass
+            s = storage.public_settings()
+            return {"surum": VERSION, "ad": APP_NAME, "formatlar": public_formats(), "degradeler": GRADIENTS,
+                    "ayarlar": s, "stiller": list_styles(), "yazicilar": self._yazicilar(),
+                    "varsayilanlar": {"rotus": DEFAULT_RETOUCH, "matte": DEFAULT_MATTE, "bg": DEFAULT_BG, "geom": DEFAULT_GEOM},
+                    "modeller": {k: models.has_model(k) for k in models.MODELS}, "windows": printing.WIN}
+        finally:
+            try:
+                from .log import log as _log
+                _log(f"Açılış · init tamamlandı: {time.time() - _t:.2f} sn")
+            except Exception:
+                pass
 
     def pick_files(self):
         if not self.window:

@@ -279,3 +279,4 @@ kbd{display:inline-block;min-width:24px;padding:2px 7px;border-radius:6px;border
 .mv-pop input[type=range]{flex:1;min-width:0}
 .mv-pop .sayi{width:54px;height:26px;border-radius:6px;border:1px solid var(--cizgi);background:var(--yukselti);color:var(--yazi);text-align:right;padding:0 4px}
 .mv-pop i{font-style:normal;width:14px}
+.mv-harita{display:block;border-radius:6px;border:1px solid var(--cizgi);cursor:pointer;background:#222}

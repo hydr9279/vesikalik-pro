@@ -49,16 +49,19 @@ async function manuelAc(mod) {
     const plaka = async (src) => { const pi = await mvResim(src); const c = document.createElement("canvas"); c.width = W; c.height = H; const x = c.getContext("2d", {willReadFrequently: true}); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = "high"; x.drawImage(pi, 0, 0, W, H); return x.getImageData(0, 0, W, H).data; };
     plB = await plaka(r.plaka_b); plF = await plaka(r.plaka_f);
   }
-  let bulanik = null;
+  let bulanik = null, bulanikB = null;
   if (mod === "rotus") {   // cilt yumuşatma fırçası için bir kez hesaplanan alçak geçirgen kopya
     const bc = document.createElement("canvas"); bc.width = W; bc.height = H; const bx = bc.getContext("2d", {willReadFrequently: true});
     bx.filter = `blur(${Math.max(3, Math.round(W / 420))}px)`; bx.drawImage(tmp, 0, 0); bx.filter = "none";
     bulanik = bx.getImageData(0, 0, W, H).data;
+    const b2 = document.createElement("canvas"); b2.width = W; b2.height = H; const b2x = b2.getContext("2d", {willReadFrequently: true});
+    b2x.filter = `blur(${Math.max(6, Math.round(W / 180))}px)`; b2x.drawImage(tmp, 0, 0); b2x.filter = "none";
+    bulanikB = b2x.getImageData(0, 0, W, H).data;
   }
   const cov = new Float32Array(W * H);
 
   // ---- görünüm (yakınlaştırma / kaydırma)
-  const uygula = () => { sahne.style.transform = `translate(${M.tx}px,${M.ty}px) scale(${M.zoom})`; $("#mvDurum", kok).textContent = `%${Math.round(M.zoom * 100)} · ${W}×${H}px`; selCiz(); };
+  const uygula = () => { sahne.style.transform = `translate(${M.tx}px,${M.ty}px) scale(${M.zoom})`; $("#mvDurum", kok).textContent = `%${Math.round(M.zoom * 100)} · ${W}×${H}px`; selCiz(); haritaCiz(); };
   const sigdir = () => { const ar = alan.getBoundingClientRect(); M.zoom = Math.min(ar.width / W, ar.height / H) * 0.96; M.tx = (ar.width - W * M.zoom) / 2; M.ty = (ar.height - H * M.zoom) / 2; uygula(); };
   const noktaya = (e) => { const ar = alan.getBoundingClientRect(); return [(e.clientX - ar.left - M.tx) / M.zoom, (e.clientY - ar.top - M.ty) / M.zoom]; };
   alan.addEventListener("wheel", (e) => {
@@ -113,7 +116,7 @@ async function manuelAc(mod) {
     M.gecmis.push({x: a, y: b, w, h: hh, once, sonra}); if (M.gecmis.length > 60) M.gecmis.shift();
     M.ileri = []; M.kirli = true; snap = null; kirli = null;
     for (let y = b; y < d; y++) cov.fill(0, y * W + a, y * W + c);
-    gecmisCiz();
+    gecmisCiz(); haritaCiz();
   };
   const kaydirGecmis = (g, ileri) => {
     const veri = ileri ? g.sonra : g.once;
@@ -140,6 +143,58 @@ async function manuelAc(mod) {
       d[p] = s[p] * (1 - e) + s[q] * e; d[p + 1] = s[p + 1] * (1 - e) + s[q + 1] * e; d[p + 2] = s[p + 2] * (1 - e) + s[q + 2] * e;
     }
     dikdortgenGenislet(x0, y0, x1 - x0, y1 - y0); goster(x0, y0, x1 - x0, y1 - y0);
+  };
+  // genel fırça darbesi: akış (flow) birikimi + opaklık tavanı
+  const darbe = (px, py, fn) => {
+    const r = M.boyut / 2, d = wd.data, op = M.guc / 100, ak = M.akis / 100;
+    const x0 = Math.max(0, Math.floor(px - r)), x1 = Math.min(W, Math.ceil(px + r) + 1), y0 = Math.max(0, Math.floor(py - r)), y1 = Math.min(H, Math.ceil(py + r) + 1);
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+      const a = fircaA(Math.hypot(x - px, y - py), r, M.sert); if (a <= 0) continue;
+      const i = y * W + x; cov[i] += (1 - cov[i]) * a * ak;
+      fn(i, i * 4, cov[i] * op, x, y, d);
+    }
+    dikdortgenGenislet(x0, y0, x1 - x0, y1 - y0); goster(x0, y0, x1 - x0, y1 - y0);
+  };
+  const parla = (c) => 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
+  // İyileştirme fırçası: kaynağın dokusunu alır, rengi/ışığı hedefin çevresine uydurur
+  const iyilestirNokta = (px, py) => {
+    const s = snap, ox = M.ofs[0], oy = M.ofs[1];
+    darbe(px, py, (i, p, e, x, y, d) => {
+      const sx = Math.round(x + ox), sy = Math.round(y + oy); if (sx < 0 || sy < 0 || sx >= W || sy >= H) return;
+      const q = (sy * W + sx) * 4;
+      for (let c = 0; c < 3; c++) { const yeni = s[q + c] + (bulanikB[p + c] - bulanikB[q + c]); d[p + c] = s[p + c] * (1 - e) + mvKelep(yeni, 0, 255) * e; }
+    });
+  };
+  // Orijinale döndür: ekran açıldığındaki hale geri getirir
+  const geriNokta = (px, py) => { const o = orig.data, s = snap; darbe(px, py, (i, p, e, x, y, d) => { for (let c = 0; c < 3; c++) d[p + c] = s[p + c] * (1 - e) + o[p + c] * e; }); };
+  // Parlama gider: yerel ortalamanın üstüne çıkan parlak fazlalığı azaltır, dokuyu korur
+  const parlamaNokta = (px, py) => {
+    const s = snap;
+    darbe(px, py, (i, p, e, x, y, d) => {
+      const L = 0.299 * s[p] + 0.587 * s[p + 1] + 0.114 * s[p + 2], Ll = 0.299 * bulanikB[p] + 0.587 * bulanikB[p + 1] + 0.114 * bulanikB[p + 2];
+      const fazla = L - Ll + 4; if (fazla <= 0) return;
+      const yeniL = Math.max(1, L - fazla * 0.9 * mvKelep(fazla / 24, 0, 1)), k = yeniL / Math.max(1, L);
+      for (let c = 0; c < 3; c++) d[p + c] = s[p + c] * (1 - e) + mvKelep(s[p + c] * k, 0, 255) * e;
+    });
+  };
+  // Aydınlat / Karart (Dodge / Burn)
+  const pozlamaNokta = (px, py, aydinlat) => {
+    const s = snap;
+    darbe(px, py, (i, p, e, x, y, d) => {
+      const k = aydinlat ? 1 + 0.45 * e : 1 - 0.45 * e;
+      for (let c = 0; c < 3; c++) d[p + c] = mvKelep(s[p + c] * k + (aydinlat ? (255 - s[p + c]) * 0.05 * e : 0), 0, 255);
+    });
+  };
+  // Göz / diş beyazlat: beyaza yakın bölgede rengi azaltır ve hafifçe açar
+  const beyazlatNokta = (px, py) => {
+    const s = snap;
+    darbe(px, py, (i, p, e, x, y, d) => {
+      const r_ = s[p], g_ = s[p + 1], b_ = s[p + 2], mx = Math.max(r_, g_, b_), mn = Math.min(r_, g_, b_), L = 0.299 * r_ + 0.587 * g_ + 0.114 * b_;
+      const doy = mx ? (mx - mn) / mx : 0, w = e * mvSmooth(50, 130, L) * (1 - mvSmooth(0.35, 0.7, doy));
+      if (w <= 0) return;
+      const t = 0.7 * w, ac = 1 + 0.10 * w;
+      d[p] = mvKelep((s[p] * (1 - t) + L * t) * ac, 0, 255); d[p + 1] = mvKelep((s[p + 1] * (1 - t) + L * t) * ac, 0, 255); d[p + 2] = mvKelep((s[p + 2] * (1 - t) + L * t) * ac, 0, 255);
+    });
   };
   const yumusatNokta = (px, py) => {
     const r = M.boyut / 2, d = wd.data, s = snap, op = M.guc / 100, t = M.doku / 100;
@@ -253,18 +308,20 @@ async function manuelAc(mod) {
   // ---- fare
   let cizim = null, son = null, bosluk = false, tut = null;
   const arac = () => M.arac;
+  const KAYNAKLI = (a) => a === "klon" || a === "iyilestir";
   const noktaKalan = (e) => { const [x, y] = noktaya(e); return [x, y]; };
   const dabCalistir = (x, y) => {
     const a = arac();
-    if (mod === "rotus") { if (a === "klon") klonNokta(x, y); else if (a === "yumusat") yumusatNokta(x, y); else if (a === "nokta") noktaIyilestir(x, y); }
+    if (mod === "rotus") { if (a === "klon") klonNokta(x, y); else if (a === "iyilestir") iyilestirNokta(x, y); else if (a === "geri") geriNokta(x, y); else if (a === "parlama") parlamaNokta(x, y);
+      else if (a === "aydinlat") pozlamaNokta(x, y, true); else if (a === "karart") pozlamaNokta(x, y, false); else if (a === "beyazlat") beyazlatNokta(x, y); else if (a === "yumusat") yumusatNokta(x, y); else if (a === "nokta") noktaIyilestir(x, y); }
     else dekupeNokta(x, y);
   };
   alan.addEventListener("pointerdown", (e) => {
     if (e.button === 1 || (e.button === 0 && M.bosluk)) { tut = {x: e.clientX, y: e.clientY, tx: M.tx, ty: M.ty}; alan.setPointerCapture(e.pointerId); e.preventDefault(); return; }
     if (e.button !== 0) return;
     const [x, y] = noktaKalan(e);
-    if (arac() === "klon" && e.altKey) { M.kaynak = [x, y]; M.ofs = null; arayuzGuncelle(); durumIpucu("Klon kaynağı seçildi: boyamaya başlayın"); return; }
-    if (arac() === "klon") {
+    if (KAYNAKLI(arac()) && e.altKey) { M.kaynak = [x, y]; M.ofs = null; arayuzGuncelle(); durumIpucu("Klon kaynağı seçildi: boyamaya başlayın"); return; }
+    if (KAYNAKLI(arac())) {
       if (!M.kaynak) { durumIpucu("Önce Alt + tıklayarak kaynak noktasını seçin"); return; }
       if (!M.ofs || !M.hizali) M.ofs = [M.kaynak[0] - x, M.kaynak[1] - y];
     }
@@ -277,7 +334,7 @@ async function manuelAc(mod) {
   });
   alan.addEventListener("pointermove", (e) => {
     const ar = alan.getBoundingClientRect(), d = M.boyut * M.zoom;
-    if (["klon", "yumusat", "nokta", "sac", "ekle", "sil", "keskin", "daralt", "genislet"].includes(arac())) {
+    if (FIRCALI.includes(arac())) {
       Object.assign(imlec.style, {display: "block", width: d + "px", height: d + "px", left: (e.clientX - ar.left - d / 2) + "px", top: (e.clientY - ar.top - d / 2) + "px"});
       alan.style.cursor = "none";
     } else { imlec.style.display = "none"; alan.style.cursor = "crosshair"; }
@@ -301,7 +358,7 @@ async function manuelAc(mod) {
   };
   alan.addEventListener("pointerup", birak); alan.addEventListener("pointercancel", birak);
   alan.addEventListener("pointerleave", () => { imlec.style.display = "none"; });
-  const FIRCALI = ["klon", "yumusat", "nokta", "sac", "ekle", "sil", "keskin", "daralt", "genislet"];
+  const FIRCALI = ["klon", "iyilestir", "geri", "parlama", "aydinlat", "karart", "beyazlat", "yumusat", "nokta", "sac", "ekle", "sil", "keskin", "daralt", "genislet"];
   let popup = null;
   const popupKapat = () => { if (popup) { popup.remove(); popup = null; document.removeEventListener("pointerdown", disTik, true); } };
   const disTik = (e) => { if (popup && !popup.contains(e.target)) popupKapat(); };
@@ -339,11 +396,14 @@ async function manuelAc(mod) {
   // ---- arayüz: sol araç sütunu, üst ayar çubuğu, sağ panel
   const ARACLAR = mod === "rotus"
     ? [["klon", "Klon damgası", "Alt + tıkla: kaynağı seç, sonra boyayarak kopyala (S)", "◎"], ["yama", "Yama", "Lekenin çevresini elle çizerek seçin, sonra seçimi temiz bir alana sürükleyin (J)", "⬚"],
-       ["nokta", "Nokta iyileştirme", "Lekenin üzerine tıklayın: çevreden en uygun dokuyla otomatik doldurur (Q)", "✦"], ["yumusat", "Cilt yumuşat", "Fırçayla ten düzensizliğini yumuşatır, dokuyu korur (W)", "◌"]]
+       ["iyilestir", "İyileştirme fırçası", "Alt + tıkla kaynağı seç; dokuyu kopyalar, rengi ve ışığı çevreye uydurur (H)", "✚"],
+       ["nokta", "Nokta iyileştirme", "Lekenin üzerine tıklayın: çevreden en uygun dokuyla otomatik doldurur (Q)", "✦"], ["yumusat", "Cilt yumuşat", "Fırçayla ten düzensizliğini yumuşatır, dokuyu korur (W)", "◌"],
+       ["parlama", "Parlama gider", "Alın, burun, yanaktaki yağ parlamasını siler; dokuyu korur (P)", "☀"], ["aydinlat", "Aydınlat", "Gölge ve göz altı morluğunu yerel olarak açar (L)", "◑"], ["karart", "Karart", "Fazla parlak bölgeyi yerel olarak koyulaştırır (B)", "◐"],
+       ["beyazlat", "Göz / diş beyazlat", "Göz akı ve dişlerde sararmayı giderir, ten rengine etki etmez (T)", "◇"], ["geri", "Orijinale döndür", "Fırçayla geçtiğiniz yeri bu ekran açıldığındaki haline geri getirir (O)", "↺"]]
     : [["sac", "Saç fırçası", "Kenarı iyileştir: saç tellerini renk farkına göre geri getirir, gri haleyi siler (S)", "≋"], ["ekle", "Ekle", "Fırçanın altını kişiye ekler (A)", "＋"], ["sil", "Sil", "Fırçanın altını fon olarak siler (E)", "−"],
        ["yumusat", "Yumuşat", "Maske kenarını yumuşatır (U)", "◌"], ["keskin", "Keskinleştir", "Maske kenarını netleştirir (K)", "◆"], ["daralt", "Daralt", "Kenarı içe doğru kaydırır (D)", "⇥"], ["genislet", "Genişlet", "Kenarı dışa doğru kaydırır (G)", "⇤"]];
   const sol = $("#mvSol", kok);
-  const solCiz = () => { sol.innerHTML = ""; ARACLAR.forEach(([k, ad, ip, ik]) => { const b = h(`<button class="mv-arac ${M.arac === k ? "secili" : ""}" title="${esc(ad + " — " + ip)}"><span>${ik}</span><small>${esc(ad)}</small></button>`); b.onclick = () => { popupKapat(); M.arac = k; M.sel = null; selCiz(); arayuzGuncelle(); }; sol.append(b); }); };
+  const solCiz = () => { sol.innerHTML = ""; ARACLAR.forEach(([k, ad, ip, ik]) => { const b = h(`<button class="mv-arac ${M.arac === k ? "secili" : ""}" title="${esc(ad + " — " + ip)}"><span>${ik}</span><small>${esc(ad)}</small></button>`); b.onclick = () => { popupKapat(); M.kaynak = KAYNAKLI(k) && KAYNAKLI(M.arac) ? M.kaynak : null; M.ofs = null; M.arac = k; M.sel = null; selCiz(); arayuzGuncelle(); }; sol.append(b); }); };
   const ayarEl = $("#mvAyar", kok);
   const slider = (etiket, ip, min, max, deger, birim, cb) => {
     const e = h(`<label class="mv-s" title="${esc(ip)}"><span>${etiket}</span><button type="button" class="ok">◄</button><input type="range" min="${min}" max="${max}" value="${deger}"><button type="button" class="ok">►</button><b>${deger}${birim}</b></label>`);
@@ -366,19 +426,20 @@ async function manuelAc(mod) {
       ayarEl.append(slider("Yayılım", "Yama kenarının çevreye karışma miktarı (Photoshop'taki Diffusion)", 1, 7, M.yay, "", v => M.yay = v));
       ayarEl.append(slider("Uyum", "Yamanın çevre ışığına ve rengine uyumu", 1, 100, M.guc, "%", v => M.guc = v));
     } else {
-      const gucAd = {klon: "Opaklık", nokta: "Güç", yumusat: "Güç", sac: "Güç", ekle: "Güç", sil: "Güç", keskin: "Güç", daralt: "Güç", genislet: "Güç"}[M.arac];
+      const gucAd = {klon: "Opaklık", iyilestir: "Opaklık", geri: "Opaklık", parlama: "Güç", aydinlat: "Pozlama", karart: "Pozlama", beyazlat: "Güç", nokta: "Güç", yumusat: "Güç", sac: "Güç", ekle: "Güç", sil: "Güç", keskin: "Güç", daralt: "Güç", genislet: "Güç"}[M.arac];
       const gucIp = {klon: "Kopyalanan dokunun en fazla şeffaflığı (Photoshop'taki Opacity)"}[M.arac] || "Fırça etkisinin gücü";
       ayarEl.append(slider(gucAd, gucIp, 1, 100, M.guc, "%", v => M.guc = v));
-      if (M.arac === "klon") ayarEl.append(slider("Akış", "Aynı yere tekrar boyadıkça etkinin birikme hızı (Photoshop'taki Flow)", 1, 100, M.akis, "%", v => M.akis = v));
+      if (["klon", "iyilestir", "geri", "parlama", "aydinlat", "karart", "beyazlat"].includes(M.arac)) ayarEl.append(slider("Akış", "Aynı yere tekrar boyadıkça etkinin birikme hızı (Photoshop'taki Flow)", 1, 100, M.akis, "%", v => M.akis = v));
     }
     if (M.arac === "yumusat" && mod === "rotus") ayarEl.append(slider("Doku", "Yumuşatırken korunan ince doku miktarı", 0, 100, M.doku, "%", v => M.doku = v));
-    if (M.arac === "klon") ayarEl.append(secimEl("Hizalı", "Açık: kaynak ile hedef arasındaki fark vuruşlar arasında sabit kalır (Photoshop'taki Aligned)", M.hizali, v => { M.hizali = v; M.ofs = null; }));
+    if (KAYNAKLI(M.arac)) ayarEl.append(secimEl("Hizalı", "Açık: kaynak ile hedef arasındaki fark vuruşlar arasında sabit kalır (Photoshop'taki Aligned)", M.hizali, v => { M.hizali = v; M.ofs = null; }));
     if (mod === "dekupe") ayarEl.append(slider("Renk taşması", "Kenardaki eski fon rengini temizleme miktarı (önizleme ve sonuç)", 0, 100, M.tasma, "%", v => { M.tasma = v; tumuBoya(); }));
   };
   const sag = $("#mvSag", kok);
   const gecmisCiz = () => { const g = $("#mvGecmis", kok); if (g) g.textContent = `${M.gecmis.length} işlem`; $("#mvGeri", kok) && ($("#mvGeri", kok).disabled = !M.gecmis.length); $("#mvIleri", kok) && ($("#mvIleri", kok).disabled = !M.ileri.length); };
   const sagCiz = () => {
     sag.innerHTML = `<div class="mv-bolum"><h4>Görünüm</h4><div class="mv-gor"></div></div>
+      <div class="mv-bolum"><h4>Harita</h4><canvas id="mvHarita" class="mv-harita" title="Tıklayın veya sürükleyin: görünümü o noktaya taşır"></canvas></div>
       <div class="mv-bolum"><h4>Geçmiş</h4><div class="satir"><button class="btn kucuk" id="mvGeri" title="Son işlemi geri al (Ctrl+Z)">↶ Geri al</button><button class="btn kucuk" id="mvIleri" title="Geri alınanı yinele (Ctrl+Y)">↷ İleri</button></div><div class="not" id="mvGecmis"></div></div>
       <div class="mv-bolum"><h4>Yakınlaştırma</h4><div class="satir"><button class="btn kucuk" id="mvSigdir" title="Tüm fotoğrafı sığdır (0)">Sığdır</button><button class="btn kucuk" id="mv100" title="%100 boyut (1)">%100</button></div><div class="not">Fare tekerleği: yakınlaştır · Boşluk + sürükle: kaydır</div></div>
       <div class="mv-bolum"><h4>Karşılaştır</h4><button class="btn kucuk genis" id="mvOnce" title="Basılı tutarken orijinal görünür (\\ tuşu)">Önce / Sonra (basılı tut)</button></div>`;
@@ -390,8 +451,24 @@ async function manuelAc(mod) {
     $("#mv100", sag).onclick = () => { const ar = alan.getBoundingClientRect(); M.zoom = 1; M.tx = (ar.width - W) / 2; M.ty = (ar.height - H) / 2; uygula(); };
     const ob = $("#mvOnce", sag), ac = (v) => { M.onceMi = v; if (mod === "dekupe") boyaDekupe(0, 0, W, H); cx.putImageData(v ? orig : wd, 0, 0); };
     ob.onpointerdown = () => ac(true); ob.onpointerup = ob.onpointerleave = () => { if (M.onceMi) ac(false); };
-    gecmisCiz();
+    gecmisCiz(); haritaKur();
   };
+  const haritaCiz = () => {
+    const hc = $("#mvHarita", kok); if (!hc || !hc.width) return;
+    const x = hc.getContext("2d"); x.clearRect(0, 0, hc.width, hc.height); x.drawImage(cv, 0, 0, hc.width, hc.height);
+    const ar = alan.getBoundingClientRect(), k = hc.width / W;
+    const vx = mvKelep(-M.tx / M.zoom, 0, W), vy = mvKelep(-M.ty / M.zoom, 0, H), vw = Math.min(W - vx, ar.width / M.zoom), vh = Math.min(H - vy, ar.height / M.zoom);
+    x.fillStyle = "rgba(0,0,0,.35)"; x.beginPath(); x.rect(0, 0, hc.width, hc.height); x.rect(vx * k, vy * k, vw * k, vh * k); x.fill("evenodd");
+    x.strokeStyle = "#fff"; x.lineWidth = 1.5; x.strokeRect(vx * k, vy * k, vw * k, vh * k);
+  };
+  const haritaKur = () => {
+    const hc = $("#mvHarita", kok); if (!hc) return;
+    const gen = 190; hc.width = gen; hc.height = Math.max(40, Math.round(gen * H / W)); hc.style.width = gen + "px"; hc.style.height = hc.height + "px";
+    const tasi = (e) => { const r = hc.getBoundingClientRect(), ar = alan.getBoundingClientRect(); const ix = (e.clientX - r.left) / r.width * W, iy = (e.clientY - r.top) / r.height * H; M.tx = ar.width / 2 - ix * M.zoom; M.ty = ar.height / 2 - iy * M.zoom; uygula(); };
+    let tut_ = false; hc.onpointerdown = (e) => { tut_ = true; hc.setPointerCapture(e.pointerId); tasi(e); }; hc.onpointermove = (e) => { if (tut_) tasi(e); }; hc.onpointerup = () => { tut_ = false; };
+    haritaCiz();
+  };
+  MV.haritaCiz = haritaCiz;
   const arayuzGuncelle = () => { solCiz(); ayarCiz(); sagCiz(); };
   arayuzGuncelle();
 
@@ -410,7 +487,7 @@ async function manuelAc(mod) {
       if (e.key === "0") { sigdir(); return; }
       if ((e.key === "Escape" || e.key === "Enter") && popup) { popupKapat(); return; }
       if (e.key === "Escape") { if (M.sel) { M.sel = null; selCiz(); } else iptal(); return; }
-      const eslesme = mod === "rotus" ? {s: "klon", j: "yama", q: "nokta", w: "yumusat"} : {s: "sac", a: "ekle", e: "sil", u: "yumusat", k: "keskin", d: "daralt", g: "genislet"};
+      const eslesme = mod === "rotus" ? {s: "klon", j: "yama", q: "nokta", w: "yumusat", h: "iyilestir", o: "geri", p: "parlama", l: "aydinlat", b: "karart", t: "beyazlat"} : {s: "sac", a: "ekle", e: "sil", u: "yumusat", k: "keskin", d: "daralt", g: "genislet"};
       if (!e.ctrlKey && eslesme[k]) { M.arac = eslesme[k]; M.sel = null; arayuzGuncelle(); }
     } else {
       if (e.code === "Space") { M.bosluk = false; alan.style.cursor = ""; }

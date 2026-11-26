@@ -71,8 +71,10 @@ def _splash_calis(hazir_dosya):
     else:
         tk.Label(fr, text="HAYAL MEDYA", fg="#F5B63F", bg="#0E1014", font=("Segoe UI", 22, "bold")).pack(pady=(40, 6))
     tk.Label(fr, text="Vesikalık Pro yükleniyor…", fg="#E6E8EC", bg="#0E1014", font=("Segoe UI", 12, "bold")).pack()
-    tk.Label(fr, text="Yapay zeka modelleri hazırlanıyor, lütfen bekleyin. Tekrar tıklamanız gerekmez.",
-             fg="#8A92A0", bg="#0E1014", font=("Segoe UI", 9)).pack(pady=(4, 12))
+    tk.Label(fr, text="Lütfen bekleyin, tekrar tıklamanız gerekmez.",
+             fg="#8A92A0", bg="#0E1014", font=("Segoe UI", 9)).pack(pady=(4, 6))
+    durum = tk.Label(fr, text="Program başlatılıyor…", fg="#F5B63F", bg="#0E1014", font=("Segoe UI", 9, "bold"))
+    durum.pack(pady=(0, 8))
     bw = 380
     cv = tk.Canvas(fr, width=bw, height=8, bg="#1B1F27", highlightthickness=0)
     cv.pack()
@@ -83,6 +85,13 @@ def _splash_calis(hazir_dosya):
         if os.path.exists(hazir_dosya) or time.time() - t0 > 90:
             r.destroy()
             return
+        try:
+            with open(hazir_dosya + ".durum", encoding="utf-8") as f:
+                t = f.read().strip()
+            if t and t != durum.cget("text"):
+                durum.config(text=t)
+        except Exception:
+            pass
         st["x"] += 9
         if st["x"] > bw:
             st["x"] = -120
@@ -114,6 +123,13 @@ class Acilis:
         except Exception:
             self._pr = None
 
+    def durum(self, metin):
+        try:
+            with open(self._dosya + ".durum", "w", encoding="utf-8") as f:
+                f.write(metin)
+        except Exception:
+            pass
+
     def kapat(self):
         try:
             open(self._dosya, "w").close()
@@ -128,17 +144,26 @@ class Acilis:
 
 
 def main(acilis):
+    import time
+    t0 = time.time()
+    acilis.durum("Yapay zeka altyapısı yükleniyor…")
     import webview
     from engine.api import Api
     from engine.log import log
     from engine.paths import APP_NAME, VERSION, res_dir
+    adim = lambda ad: log(f"Açılış · {ad}: {time.time() - t0:.2f} sn")
+    adim("modüller yüklendi")
     api = Api()
+    acilis.durum("Pencere oluşturuluyor…")
     ui = os.path.join(res_dir(), "ui", "index.html")
     win = webview.create_window(f"{APP_NAME} {VERSION}", ui, js_api=api, width=1440, height=900,
                                 min_size=(1180, 720), background_color="#0E1014")
     api.window = win
+    adim("pencere oluşturuldu")
+    acilis.durum("Arayüz hazırlanıyor…")
     try:
-        win.events.loaded += lambda: acilis.kapat()
+        win.events.shown += lambda: (adim("pencere göründü"), acilis.durum("Arayüz hazırlanıyor…"))
+        win.events.loaded += lambda: (adim("arayüz yüklendi"), acilis.kapat())
         win.events.shown += lambda: threading.Timer(1.5, acilis.kapat).start()   # yedek: pencere görününce en geç 1,5 sn
     except Exception:
         pass
