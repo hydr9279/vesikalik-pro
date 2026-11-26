@@ -2,6 +2,11 @@
 HAYDAR ALTINSABAN yapımıdır · Tüm hakları saklıdır
 HAYAL MEDYA · 0312 264 0 888 · Haydar Altınsaban · 0554 990 49 59
 
+SÜRÜM 1.4.4
+- İlk açılışta pencerenin "yanıt vermiyor" demesi için kalıcı çözüm: pencere motoru artık her açılışta geçici profil kurmak yerine sürüme özel kalıcı bir klasör kullanır (eski sürüm klasörleri otomatik silinir)
+- Yükleme ekranı artık arayüz tamamen yüklenene kadar açık kalır; bekleme uzarsa "lütfen kapatmayın" yazısı çıkar
+- Arayüz 20 saniyede yüklenmezse günlüğe uyarı yazılır
+
 SÜRÜM 1.4.3
 - Ana menü düğmesi her ekranda (üst çubuk, Alt+Home); Polaroid ve Serbest Baskı'da çarpı yerine "Ana menüye dön"
 - Polaroid / Serbest Baskı: fotoğrafa çift tıklayınca tam sayfa düzenleme (fareyle kaydır, tekerlekle yakınlaştır, renk ayarları, ayarları sıfırla, önceki/sonraki)

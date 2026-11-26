@@ -82,16 +82,21 @@ def _splash_calis(hazir_dosya):
     st = {"x": -120}
 
     def tick():
-        if os.path.exists(hazir_dosya) or time.time() - t0 > 90:
+        gecen = time.time() - t0
+        if os.path.exists(hazir_dosya) or gecen > 90:
             r.destroy()
             return
         try:
             with open(hazir_dosya + ".durum", encoding="utf-8") as f:
                 t = f.read().strip()
-            if t and t != durum.cget("text"):
-                durum.config(text=t)
         except Exception:
-            pass
+            t = ""
+        if gecen > 25:
+            t = "Bilgisayar ilk açılışta yavaş kalabilir. Lütfen kapatmayın, birkaç saniye daha…"
+        elif gecen > 10:
+            t = "Hâlâ hazırlanıyor, lütfen bekleyin…"
+        if t and t != durum.cget("text"):
+            durum.config(text=t)
         st["x"] += 9
         if st["x"] > bw:
             st["x"] = -120
@@ -143,6 +148,33 @@ class Acilis:
             pass
 
 
+def _webview_profil():
+    """Sürüme özel kalıcı WebView2 profil klasörü. Her açılışta geçici profil oluşturmak (virüs tarayıcı, OneDrive)
+    ilk açılışı yavaşlatıp pencerenin 'yanıt vermiyor' demesine yol açabiliyordu. Sürüm numarasıyla ayrıldığı için
+    eski sürümün önbelleği yeni sürüme karışmaz; eski sürüm klasörleri silinir."""
+    import shutil
+    import hashlib
+    from engine.paths import VERSION, res_dir
+    h = hashlib.md5()
+    for f in ("app.js", "manuel.js", "moduller.js", "app.css", "index.html"):   # arayüz dosyaları değişince profil de yenilenir
+        try:
+            with open(os.path.join(res_dir(), "ui", f), "rb") as fh:
+                h.update(fh.read())
+        except Exception:
+            pass
+    etiket = f"v{VERSION}-{h.hexdigest()[:8]}"
+    base = os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "HayalMedyaVesikalikPro", "webview")
+    yol = os.path.join(base, etiket)
+    try:
+        os.makedirs(yol, exist_ok=True)
+        for d in os.listdir(base):
+            if d != etiket:
+                shutil.rmtree(os.path.join(base, d), ignore_errors=True)
+    except Exception:
+        pass
+    return yol
+
+
 def main(acilis):
     import time
     t0 = time.time()
@@ -164,11 +196,15 @@ def main(acilis):
     try:
         win.events.shown += lambda: (adim("pencere göründü"), acilis.durum("Arayüz hazırlanıyor…"))
         win.events.loaded += lambda: (adim("arayüz yüklendi"), acilis.kapat())
-        win.events.shown += lambda: threading.Timer(1.5, acilis.kapat).start()   # yedek: pencere görününce en geç 1,5 sn
+        yuklendi = threading.Event()
+        win.events.loaded += lambda: yuklendi.set()
+        threading.Timer(20.0, lambda: (not yuklendi.is_set()) and log("Açılış · UYARI: arayüz 20 sn içinde yüklenmedi", "WARN")).start()
     except Exception:
         pass
     log(f"Program başlatıldı v{VERSION}")
-    webview.start(debug=("--debug" in sys.argv), private_mode=True)
+    profil = _webview_profil()
+    adim(f"profil: {profil}")
+    webview.start(debug=("--debug" in sys.argv), private_mode=False, storage_path=profil)
     acilis.kapat()
 
 

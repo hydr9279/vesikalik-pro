@@ -1,6 +1,6 @@
 ﻿; Hayal Medya Vesikalık Pro — Inno Setup kurulum betiği
 #define Ad "Hayal Medya Vesikalık Pro"
-#define Surum "1.4.3"
+#define Surum "1.4.4"
 #ifndef Varyant
   #define Varyant "NVIDIA"
 #endif
