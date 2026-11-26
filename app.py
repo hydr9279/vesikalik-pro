@@ -15,7 +15,7 @@ def main():
                                 min_size=(1180, 720), background_color="#0E1014")
     api.window = win
     log(f"Program başlatıldı v{VERSION}")
-    webview.start(debug=("--debug" in sys.argv), private_mode=False)
+    webview.start(debug=("--debug" in sys.argv), private_mode=True)
 
 
 if __name__ == "__main__":
