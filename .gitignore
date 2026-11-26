@@ -6,3 +6,4 @@ dist/
 build/
 kurulum/cikti/
 *.spec
+models
