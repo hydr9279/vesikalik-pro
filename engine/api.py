@@ -27,8 +27,8 @@ EDIT_MULT = 2  # düzenleme önizlemesi: 600 px/inç
 
 class Api:
     def __init__(self):
-        self.window = None
-        self.jobs: dict = {}
+        self._window = None
+        self._jobs: dict = {}
         self._prog = {"aktif": False, "yuzde": 0, "mesaj": "", "basla": 0}
         self._plock = threading.Lock()
 
@@ -178,18 +178,18 @@ class Api:
                 pass
 
     def pick_files(self):
-        if not self.window:
+        if not self._window:
             return []
         import webview
-        r = self.window.create_file_dialog(webview.OPEN_DIALOG, allow_multiple=True,
+        r = self._window.create_file_dialog(webview.OPEN_DIALOG, allow_multiple=True,
                                            file_types=("Fotoğraflar (" + ";".join("*" + e for e in IMG_EXTS) + ")", "Tüm dosyalar (*.*)"))
         return list(r or [])
 
     def pick_folder(self, start=""):
-        if not self.window:
+        if not self._window:
             return ""
         import webview
-        r = self.window.create_file_dialog(webview.FOLDER_DIALOG, directory=start or "")
+        r = self._window.create_file_dialog(webview.FOLDER_DIALOG, directory=start or "")
         return (r[0] if isinstance(r, (list, tuple)) and r else r) or ""
 
     def add_files(self, paths):
@@ -204,7 +204,7 @@ class Api:
             try:
                 j = Job(p)
                 j.id = uuid.uuid4().hex[:8]
-                self.jobs[j.id] = j
+                self._jobs[j.id] = j
                 th = cv2.resize(j.orig, (120, int(120 * j.orig.shape[0] / j.orig.shape[1])), interpolation=cv2.INTER_AREA)
                 out.append({"id": j.id, "ad": j.name, "kucuk": to_b64(th, 160, 80), "yol": p})
             except Exception as e:
@@ -222,12 +222,12 @@ class Api:
         return self.add_files([p])
 
     def remove_job(self, jid):
-        self.jobs.pop(jid, None)
+        self._jobs.pop(jid, None)
         return {"ok": True}
 
     def analyze(self, jid, fid):
         def go():
-            j = self.jobs[jid]
+            j = self._jobs[jid]
             if not j.analyzed:
                 j.analyze(self._p)
             j.bg = dict(DEFAULT_BG)
@@ -241,7 +241,7 @@ class Api:
     # ---------------------------------------------------------- arka plan
     def matte(self, jid, fid, params=None, force=False):
         def go():
-            j = self.jobs[jid]
+            j = self._jobs[jid]
             if params:
                 if (params.get("model") and params["model"] != j.matte_params.get("model")) or \
                         ("vitmatte" in params and params["vitmatte"] != j.matte_params.get("vitmatte")):
@@ -264,7 +264,7 @@ class Api:
 
     def set_matte(self, jid, fid, params):
         def go():
-            j = self.jobs[jid]
+            j = self._jobs[jid]
             j.matte_params.update(params)
             self._p(0.5, "Kenarlar güncelleniyor")
             j.rebuild_alpha()
@@ -275,7 +275,7 @@ class Api:
     def manuel_ac(self, jid, fid, mod):
         """Manuel ekran için veri: tek seferde yüklenir, sonrası istemci tarafında anlık çalışır."""
         def go():
-            j = self.jobs[jid]
+            j = self._jobs[jid]
             if mod == "rotus":
                 if j.Wr is None:
                     j.retouch(self._p)
@@ -305,7 +305,7 @@ class Api:
     def manuel_uygula_rotus(self, jid, fid, x, y, png):
         """Değişen bölgenin RGBA yaması (alfa>0 = değişen piksel) çalışma görüntüsü koordinatında uygulanır."""
         def go():
-            j = self.jobs[jid]
+            j = self._jobs[jid]
             im = self._png_oku(png)          # BGRA
             if im is None or im.ndim != 3 or im.shape[2] != 4:
                 raise ValueError("Yama okunamadı")
@@ -327,7 +327,7 @@ class Api:
     def manuel_uygula_dekupe(self, jid, fid, alfa_png, maske_png):
         """Manuel maske: alfa (gri PNG, çalışma boyutu) + değişen piksellerin maskesi."""
         def go():
-            j = self.jobs[jid]
+            j = self._jobs[jid]
             a = self._png_oku(alfa_png)
             m = self._png_oku(maske_png)
             if a.ndim == 3: a = a[..., 0]
@@ -342,7 +342,7 @@ class Api:
 
     def manuel_sifirla(self, jid, fid, mod):
         def go():
-            j = self.jobs[jid]
+            j = self._jobs[jid]
             if mod == "rotus":
                 j.manuel_rgb = j.manuel_m = None
                 j.retouch_params["manuel"] = int(j.retouch_params.get("manuel", 0)) + 1
@@ -378,10 +378,10 @@ class Api:
         def go():
             import shutil
             from .paths import extra_model_dir
-            if not self.window:
+            if not self._window:
                 return {"eklenen": []}
             import webview
-            r = self.window.create_file_dialog(webview.OPEN_DIALOG, allow_multiple=True, file_types=("ONNX modeller (*.onnx)", "Tüm dosyalar (*.*)"))
+            r = self._window.create_file_dialog(webview.OPEN_DIALOG, allow_multiple=True, file_types=("ONNX modeller (*.onnx)", "Tüm dosyalar (*.*)"))
             eklenen, taninmayan = [], []
             for src in (r or []):
                 low = os.path.basename(src).lower()
@@ -420,7 +420,7 @@ class Api:
         """Seçilen modellerin sonucunu aynı fotoğrafta, farklı zeminlerde yan yana üretir (durum değişmez)."""
         def go():
             import copy
-            j = self.jobs[jid]
+            j = self._jobs[jid]
             fmt = self._fmt(fid)
             zl = list(zeminler or ["#FFFFFF", "#23272F", "#2E7D5B"])
             sonuc, alfalar = [], {}
@@ -473,7 +473,7 @@ class Api:
 
     def sac_modu(self, jid, fid, mod):
         def go():
-            j = self.jobs[jid]
+            j = self._jobs[jid]
             j.matte_params.update(self.SAC_MODLARI.get(mod, self.SAC_MODLARI["otomatik"]))
             j.matte_params["sac_modu"] = mod
             self._p(0.5, "Saç kenarları güncelleniyor")
@@ -484,7 +484,7 @@ class Api:
     def edit(self, jid, fid, e):
         """e: {t:'sam', x,y, pos} veya {t:'brush', pts:[[x,y]...], r, add, hard} (önizleme koordinatı 0..1)."""
         def go():
-            j = self.jobs[jid]
+            j = self._jobs[jid]
             self._p(0.3, "Seçim yeniden hesaplanıyor (SAM)" if e["t"] == "sam" else "Fırça uygulanıyor")
             if e["t"] == "sam":
                 x, y, s = self._to_work(j, fid, e["x"], e["y"])
@@ -503,19 +503,19 @@ class Api:
 
     def undo_edit(self, jid, fid):
         def go():
-            j = self.jobs[jid]
+            j = self._jobs[jid]
             j.undo_edit()
             return self._state(j, fid)
         return self._safe(go)
 
     def view(self, jid, fid, mode):
         def go():
-            return {"gorsel": self._view(self.jobs[jid], fid, mode)}
+            return {"gorsel": self._view(self._jobs[jid], fid, mode)}
         return self._safe(go)
 
     def set_bg(self, jid, fid, bg):
         def go():
-            j = self.jobs[jid]
+            j = self._jobs[jid]
             j.bg.update(bg)
             return self._state(j, fid)
         return self._safe(go)
@@ -523,7 +523,7 @@ class Api:
     # ---------------------------------------------------------- rötuş
     def retouch(self, jid, fid, params):
         def go():
-            j = self.jobs[jid]
+            j = self._jobs[jid]
             p = dict(params)
             for k in ("spots", "geri_al", "fircalar", "koruma_fircalar", "klon", "pro_ornekler", "manuel"):
                 p.pop(k, None)
@@ -538,7 +538,7 @@ class Api:
     def rotus_firca(self, jid, fid, e):
         """e: {pts:[[x,y]..] önizleme 0..1, r (önizleme genişliğine oranla), val 0..1, tur:'geri'|'koru'}"""
         def go():
-            j = self.jobs[jid]
+            j = self._jobs[jid]
             pts, s = [], 1
             for px, py in e["pts"]:
                 x, y, s = self._to_work(j, fid, px, py)
@@ -555,7 +555,7 @@ class Api:
     def klon_firca(self, jid, fid, e):
         """Klon damgası. e: {pts, src:[x,y], r, hard, val} — önizleme koordinatları (0..1)."""
         def go():
-            j = self.jobs[jid]
+            j = self._jobs[jid]
             pts = []
             for px, py in e["pts"]:
                 x, y, s = self._to_work(j, fid, px, py)
@@ -573,7 +573,7 @@ class Api:
     def sekil_firca(self, jid, fid, e):
         """Şekillendir. e: {tur:'it'|'sis'|'kuc', pts (önizleme 0..1), r (önizleme genişliğine oranla), guc 0..1}"""
         def go():
-            j = self.jobs[jid]
+            j = self._jobs[jid]
             pts = []
             for px, py in e["pts"]:
                 x, y, s = self._to_work(j, fid, px, py)
@@ -586,7 +586,7 @@ class Api:
 
     def sekil_geri_al(self, jid, fid, hepsi=False):
         def go():
-            j = self.jobs[jid]
+            j = self._jobs[jid]
             if hepsi:
                 j.shape_ops.clear(); j.omuz = 0.0
             elif j.shape_ops:
@@ -597,14 +597,14 @@ class Api:
     def sekil_omuz(self, jid, fid, miktar):
         """Otomatik omuz hizalama. miktar: 0 (kapalı) … 1 (tam düzeltme)."""
         def go():
-            j = self.jobs[jid]
+            j = self._jobs[jid]
             j.omuz = max(0.0, min(1.0, float(miktar)))
             return self._state(j, fid)
         return self._safe(go)
 
     def klon_geri_al(self, jid, fid, hepsi=False):
         def go():
-            j = self.jobs[jid]
+            j = self._jobs[jid]
             k = j.retouch_params.get("klon") or []
             if hepsi: k.clear()
             elif k: k.pop()
@@ -615,7 +615,7 @@ class Api:
     def pro_ornek(self, jid, fid, x=None, y=None, temizle=False):
         """Gelişmiş portre rötuşu için ten örneği ekler (önizleme koordinatı) ya da temizler."""
         def go():
-            j = self.jobs[jid]
+            j = self._jobs[jid]
             pro = j.retouch_params.setdefault("pro", {})
             lst = pro.setdefault("ornekler", [])
             if temizle: lst.clear()
@@ -629,7 +629,7 @@ class Api:
 
     def rotus_firca_geri_al(self, jid, fid, tur="geri"):
         def go():
-            j = self.jobs[jid]
+            j = self._jobs[jid]
             key = "koruma_fircalar" if tur == "koru" else "fircalar"
             if j.retouch_params.get(key):
                 j.retouch_params[key].pop()
@@ -640,7 +640,7 @@ class Api:
     def leke_sil(self, jid, fid, idx):
         """Otomatik bulunan (idx < bulunan sayısı) ya da elle eklenen lekeyi kaldırır."""
         def go():
-            j = self.jobs[jid]
+            j = self._jobs[jid]
             n = len(j.spots_found)
             if 0 <= idx < n:
                 j.retouch_params.setdefault("geri_al", []).append(list(j.spots_found[idx]))
@@ -654,7 +654,7 @@ class Api:
     def spot(self, jid, fid, x, y, r=0.012):
         """Leke fırçası: tıklanan yer bulunan bir lekeyse geri al, değilse leke olarak işaretle."""
         def go():
-            j = self.jobs[jid]
+            j = self._jobs[jid]
             wx, wy, s = self._to_work(j, fid, x, y)
             near = [p for p in j.spots_found if abs(p[0] - wx) < 0.01 and abs(p[1] - wy) < 0.01]
             if near:
@@ -670,7 +670,7 @@ class Api:
     def spot_toplu(self, jid, fid, pts, r=0.012):
         """Leke fırçası (toplu): birden çok nokta tek seferde işlenir."""
         def go():
-            j = self.jobs[jid]
+            j = self._jobs[jid]
             M, (Wc, Hc), ppm, s2 = j.transform(self._fmt(fid), EDIT_MULT)
             for x, y in pts:
                 wx, wy, s = self._to_work(j, fid, x, y)
@@ -696,7 +696,7 @@ class Api:
     # ---------------------------------------------------------- kadraj
     def set_geom(self, jid, fid, geom):
         def go():
-            j = self.jobs[jid]
+            j = self._jobs[jid]
             j.geom.update(geom)
             return self._state(j, fid)
         return self._safe(go)
@@ -707,7 +707,7 @@ class Api:
     # ---------------------------------------------------------- baskı ve kayıt
     def sheet(self, jid, fid, adet):
         def go():
-            j = self.jobs[jid]
+            j = self._jobs[jid]
             fmt = self._fmt(fid)
             self._p(0.4, "Son çıktı hazırlanıyor (300 DPI)")
             photo = j.render(fmt, preview=False)
@@ -719,7 +719,7 @@ class Api:
 
     def save(self, jid, fid, opts):
         def go():
-            j = self.jobs[jid]
+            j = self._jobs[jid]
             fmt = self._fmt(fid)
             folder = opts.get("klasor") or ""
             if not folder or not os.path.isdir(folder):
@@ -778,7 +778,7 @@ class Api:
                 return {"bulundu": False}
             if not uygula:
                 return {"bulundu": True, "tarih": rec.get("tarih", "")}
-            j = self.jobs[jid]
+            j = self._jobs[jid]
             if rec.get("rotus"):
                 for k, v in rec["rotus"].items():
                     if k in DEFAULT_RETOUCH:
@@ -939,7 +939,7 @@ class Api:
         def go():
             out = []
             for n, jid in enumerate(jids):
-                j = self.jobs.get(jid)
+                j = self._jobs.get(jid)
                 if not j:
                     continue
                 self._p(n / max(1, len(jids)), f"Toplu işlem {n + 1}/{len(jids)}: {j.name}")

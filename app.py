@@ -190,7 +190,7 @@ def main(acilis):
     ui = os.path.join(res_dir(), "ui", "index.html")
     win = webview.create_window(f"{APP_NAME} {VERSION}", ui, js_api=api, width=1440, height=900,
                                 min_size=(1180, 720), background_color="#0E1014")
-    api.window = win
+    api._window = win   # alt çizgili: pywebview JS köprüsü bu nesneyi taramasın (açılışta 20+ sn takılma nedeni olabilir)
     adim("pencere oluşturuldu")
     acilis.durum("Arayüz hazırlanıyor…")
     try:
