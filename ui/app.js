@@ -586,6 +586,26 @@ async function canliCalistir(istek, uygula) {
   } finally { CANLI.busy = false; }
 }
 const canliIptal = () => { CANLI.jeton++; CANLI.bekle = null; };
+const sahneCanli = (g) => { if (S.adim === 1 && S.gorunum !== "sonuc") return; const im = sahneResmi(); if (im) im.src = g; };
+const canliBg = (d) => canliCalistir(() => api.bg_onizle(S.cur, S.fid, d), sahneCanli);
+const canliMatte = (d) => canliCalistir(() => api.matte_onizle(S.cur, S.fid, d), sahneCanli);
+// Işık/renk çubukları: sürüklerken anlık (tarayıcıda yaklaşık süzgeç), bırakınca motor tam hesaplar
+const TON = {};
+function tonCanli(k, v) {
+  const r = S.st.rotus || {}, y = Object.assign({sicaklik: r.sicaklik || 0, pozlama: r.pozlama || 0, kontrast: r.kontrast || 0}, TON, {[k]: v});
+  Object.assign(TON, {[k]: v});
+  let svg = document.getElementById("tonSvg");
+  if (!svg) { document.body.insertAdjacentHTML("beforeend", `<svg id="tonSvg" width="0" height="0" style="position:absolute"><filter id="tonF" color-interpolation-filters="sRGB"><feComponentTransfer><feFuncR id="tonR" type="table" tableValues="0 1"/><feFuncG id="tonG" type="table" tableValues="0 1"/><feFuncB id="tonB" type="table" tableValues="0 1"/></feComponentTransfer></filter></svg>`); }
+  const gain = (yeni, eski, kat) => (1 + kat * yeni / 100) / (1 + kat * eski / 100);
+  const gp = Math.pow(2, (y.pozlama - (r.pozlama || 0)) / 100), gs = (y.sicaklik - (r.sicaklik || 0)) / 100;
+  const dc = (y.kontrast - (r.kontrast || 0)) / 100;
+  const tablo = (g) => { const a = []; for (let i = 0; i <= 64; i++) { let x = Math.min(1, i / 64 * g); if (dc) { const sm = x * x * (3 - 2 * x); x = Math.min(1, Math.max(0, x + (sm - x) * dc * 1.5)); } a.push(x.toFixed(4)); } return a.join(" "); };
+  document.getElementById("tonR").setAttribute("tableValues", tablo(gp * (1 + 0.08 * (y.sicaklik / 100)) / (1 + 0.08 * ((r.sicaklik || 0) / 100))));
+  document.getElementById("tonG").setAttribute("tableValues", tablo(gp));
+  document.getElementById("tonB").setAttribute("tableValues", tablo(gp * (1 - 0.08 * (y.sicaklik / 100)) / (1 - 0.08 * ((r.sicaklik || 0) / 100))));
+  const im = sahneResmi(); if (im) im.style.filter = "url(#tonF)";
+}
+const canliRotus = (d) => canliCalistir(() => api.rotus_onizle(S.cur, S.fid, {...(S.st?.rotus || {}), ...d}), sahneCanli);
 const sahneResmi = () => document.querySelector("#sahne .tuval-ic > img");
 function geomAnlik(d) {
   Object.assign(S.st.geom, d); Object.assign(geomBekleyen, d);
@@ -622,7 +642,7 @@ function kaydirici(ad, etiket, deger, min, max, adim, birim, degisti, bilgi = ""
   const inp = $("input", e), [sol, sag] = $$("button.ok", e);
   const nd = (adim + "").includes(".") ? (adim + "").split(".")[1].length : 0;
   inp.oninput = () => { $(".deger", e).textContent = inp.value + birim; if (anlik) anlik(+inp.value); };   // anlik: çubuk sürüklenirken canlı etki
-  inp.onchange = () => degisti(+inp.value);
+  inp.onchange = async () => { if (anlik) { canliIptal(); while (CANLI.busy) await new Promise(res => setTimeout(res, 15)); } degisti(+inp.value); };
   // ok düğmeleri: tek tık = bir adım, basılı tutunca tekrar, Shift = 10 adım; art arda basışlar tek işleme birleşir
   let bekle = null;
   const git = (yon, ev) => {
@@ -752,13 +772,14 @@ function panelArkaplan(p) {
   bh.append(h(`<div class="not">Saç tipi, kenar ince ayarlarını o saç yapısına göre hazırlar. Sonra aşağıdan değiştirebilirsiniz.</div>`));
   p.append(bh);
   const b2 = bolum("KENAR İNCE AYARI", `<a id="oner">Önerilene dön</a>`);
+  const manl = (k) => (v) => canliMatte({[k]: v});
   const mset = (k) => async (v) => { const r = await cagir("set_matte", S.cur, S.fid, {[k]: v}); if (r.ok) { S.st = r; sahneCiz(); } };
-  b2.append(kaydirici("fa", "Gri hale temizliği", m.fon_ayikla, 0, 100, 1, "", mset("fon_ayikla"), "Saç kenarında kalan eski fon rengini temizler"));
-  b2.append(kaydirici("sd", "Saç detayı", m.sac_detay, 0, 100, 1, "", mset("sac_detay")));
-  b2.append(kaydirici("yu", "Kenar yumuşaklığı", m.yumusaklik, 0, 100, 1, "", mset("yumusaklik")));
-  b2.append(kaydirici("da", "Kenar daraltma", m.daraltma, 0, 4, 1, " px", mset("daraltma")));
-  b2.append(kaydirici("ta", "Renk taşması temizleme", m.tasma, 0, 100, 1, "", mset("tasma")));
-  b2.append(kaydirici("st", "Uçuşan saç temizleme", m.sac_temizle, 0, 100, 1, "", mset("sac_temizle"), "Fona taşan tek tek saç tellerini siler"));
+  b2.append(kaydirici("fa", "Gri hale temizliği", m.fon_ayikla, 0, 100, 1, "", mset("fon_ayikla"), "Saç kenarında kalan eski fon rengini temizler", manl("fon_ayikla")));
+  b2.append(kaydirici("sd", "Saç detayı", m.sac_detay, 0, 100, 1, "", mset("sac_detay"), "", manl("sac_detay")));
+  b2.append(kaydirici("yu", "Kenar yumuşaklığı", m.yumusaklik, 0, 100, 1, "", mset("yumusaklik"), "", manl("yumusaklik")));
+  b2.append(kaydirici("da", "Kenar daraltma", m.daraltma, 0, 4, 1, " px", mset("daraltma"), "", manl("daraltma")));
+  b2.append(kaydirici("ta", "Renk taşması temizleme", m.tasma, 0, 100, 1, "", mset("tasma"), "", manl("tasma")));
+  b2.append(kaydirici("st", "Uçuşan saç temizleme", m.sac_temizle, 0, 100, 1, "", mset("sac_temizle"), "Fona taşan tek tek saç tellerini siler", manl("sac_temizle")));
   b2.append(kaydirici("fb", "Fırça boyutu", S.firca, 6, 160, 1, " px", v => { S.firca = v; }));
   p.append(b2);
   $("#oner", b2).onclick = async () => { const d = S.init.varsayilanlar.matte; const r = await cagir("set_matte", S.cur, S.fid, {...d, model: m.model}); if (r.ok) { S.st = r; ciz(); } };
@@ -782,18 +803,18 @@ function fonPaneli(f) {
   b.append(seg);
   if (tip === "original") {
     b.append(h(`<div class="not">Kişi kesilmez; stüdyo fonu korunur.</div>`));
-    b.append(kaydirici("fa2", "Fonu aydınlat", bg.fon_aydinlat, 0, 100, 1, "", v => set({fon_aydinlat: v})));
-    b.append(kaydirici("ft", "Fon lekelerini temizle", bg.fon_temizle, 0, 100, 1, "", v => set({fon_temizle: v})));
+    b.append(kaydirici("fa2", "Fonu aydınlat", bg.fon_aydinlat, 0, 100, 1, "", v => set({fon_aydinlat: v}), "", v => canliBg({fon_aydinlat: v})));
+    b.append(kaydirici("ft", "Fon lekelerini temizle", bg.fon_temizle, 0, 100, 1, "", v => set({fon_temizle: v}), "", v => canliBg({fon_temizle: v})));
   } else if (tip === "gradient") {
     const g = h(`<div class="fonlar"></div>`);
     S.init.degradeler.forEach(d => { const k = h(`<button class="fon ${+bg.degrade === d.no ? "secili" : ""}" title="${d.no}. ${esc(d.ad)}" style="background-image:url(assets/degrade_${d.no}.png)"><span>${d.no}</span></button>`); k.onclick = () => set({degrade: d.no, ic: null, dis: null}); g.append(k); });
     b.append(g);
     const cur = S.init.degradeler.find(d => d.no === +bg.degrade) || S.init.degradeler[0];
     b.append(h(`<div class="not"><b>${cur.no}. ${esc(cur.ad)}</b></div>`));
-    b.append(kaydirici("mx", "Işık merkezi (yatay)", Math.round(bg.merkez_x * 100), 0, 100, 1, "%", v => set({merkez_x: v / 100})));
-    b.append(kaydirici("my", "Işık merkezi (dikey)", Math.round(bg.merkez_y * 100), 0, 100, 1, "%", v => set({merkez_y: v / 100})));
-    b.append(kaydirici("ya", "Yayılma", Math.round(bg.yayilma * 100), 20, 150, 1, "%", v => set({yayilma: v / 100})));
-    b.append(kaydirici("se", "Kenar koyuluğu (sertlik)", Math.round(bg.sertlik * 10) / 10, 0.5, 3, 0.1, "", v => set({sertlik: v})));
+    b.append(kaydirici("mx", "Işık merkezi (yatay)", Math.round(bg.merkez_x * 100), 0, 100, 1, "%", v => set({merkez_x: v / 100}), "", v => canliBg({merkez_x: v / 100})));
+    b.append(kaydirici("my", "Işık merkezi (dikey)", Math.round(bg.merkez_y * 100), 0, 100, 1, "%", v => set({merkez_y: v / 100}), "", v => canliBg({merkez_y: v / 100})));
+    b.append(kaydirici("ya", "Yayılma", Math.round(bg.yayilma * 100), 20, 150, 1, "%", v => set({yayilma: v / 100}), "", v => canliBg({yayilma: v / 100})));
+    b.append(kaydirici("se", "Kenar koyuluğu (sertlik)", Math.round(bg.sertlik * 10) / 10, 0.5, 3, 0.1, "", v => set({sertlik: v}), "", v => canliBg({sertlik: v})));
     const rk = h(`<div class="satir"><div class="alan" style="flex:1"><label>İç renk</label><input type="color" class="renk-sec" value="${bg.ic || cur.ic}"></div><div class="alan" style="flex:1"><label>Dış renk</label><input type="color" class="renk-sec" value="${bg.dis || cur.dis}"></div></div>`);
     const [ri, rd] = $$("input", rk);
     ri.onchange = () => set({ic: ri.value}); rd.onchange = () => set({dis: rd.value});
@@ -811,7 +832,7 @@ function fonPaneli(f) {
 
 function panelRotus(p) {
   const r = S.st.rotus, f = S.fmt[S.fid];
-  const set = (k) => async (v) => { const x = await rotusUygula({[k]: v}); if (x.ok) { S.st.gorsel_once = S.st.gorsel_once; sahneCiz(); panelCiz(); } };
+  const set = (k) => async (v) => { const x = await rotusUygula({[k]: v}); delete TON[k]; if (x.ok) { S.st.gorsel_once = S.st.gorsel_once; sahneCiz(); panelCiz(); } };
   const pr = bolum("PROFİL");
   const profiller = S.ayar.rotus_profilleri || {};
   const sel = h(`<select aria-label="Rötuş profili"><option value="">— Profil seç —</option><option value="__dogal">Biyometrik · Doğal (önerilen)</option><option value="__belirgin">Vesikalık · Belirgin</option>${Object.keys(profiller).map(k => `<option value="${esc(k)}">${esc(k)}</option>`).join("")}</select>`);
@@ -868,7 +889,7 @@ function panelRotus(p) {
   gk.append(secim("kc", "Cildi koru (yüzde daha az keskinlik)", ks.cilt_koru !== false, sk("cilt_koru")));
   p.append(gk);
   const gs = bolum("ŞEKİLLENDİR (omuz ve duruş)");
-  gs.append(kaydirici("om", "Otomatik omuz hizalama", Math.round((S.st.omuz || 0) * 100), 0, 100, 1, "%", async v => { const x = await cagir("sekil_omuz", S.cur, S.fid, v / 100); if (x.ok) { S.st = {...x, gorsel_once: S.st.gorsel_once}; sahneCiz(); panelCiz(); } }, "Omuz hattı farkını (yüzü değiştirmeden) giderir"));
+  gs.append(kaydirici("om", "Otomatik omuz hizalama", Math.round((S.st.omuz || 0) * 100), 0, 100, 1, "%", async v => { const x = await cagir("sekil_omuz", S.cur, S.fid, v / 100); if (x.ok) { S.st = {...x, gorsel_once: S.st.gorsel_once}; sahneCiz(); panelCiz(); } }, "Omuz hattı farkını (yüzü değiştirmeden) giderir", v => canliCalistir(() => api.omuz_onizle(S.cur, S.fid, v / 100), sahneCanli)));
   gs.append(h(`<div class="not">${S.st.omuz_fark == null ? "Omuz farkı ölçülemedi." : Math.abs(S.st.omuz_fark) < 6 ? "Omuzlar zaten dengeli." : `Ölçülen omuz farkı: <b>${Math.abs(S.st.omuz_fark).toFixed(0)} px</b> (${S.st.omuz_fark > 0 ? "sol" : "sağ"} omuz daha aşağıda).`} Elle düzeltmek için araç çubuğundan <b>İt / çek</b>, <b>Şişir</b>, <b>Küçült</b>. Yüz bölgesi kilitlidir.</div>`));
   const gsb = h(`<button class="btn kucuk">Şekillendirmeyi sıfırla</button>`);
   gsb.onclick = async () => { const x = await cagir("sekil_geri_al", S.cur, S.fid, true); if (x.ok) { S.st = {...x, gorsel_once: S.st.gorsel_once}; sahneCiz(); panelCiz(); } };
@@ -887,9 +908,9 @@ function panelRotus(p) {
   p.append(gd);
   const t = bolum("IŞIK VE RENK");
   t.append(secim("ob", "Otomatik beyaz dengesi (fona göre)", r.oto_beyaz, set("oto_beyaz")));
-  t.append(kaydirici("po", "Pozlama", r.pozlama, -100, 100, 1, "", set("pozlama")));
-  t.append(kaydirici("ko", "Kontrast", r.kontrast, -100, 100, 1, "", set("kontrast")));
-  t.append(kaydirici("si", "Sıcaklık", r.sicaklik, -100, 100, 1, "", set("sicaklik")));
+  t.append(kaydirici("po", "Pozlama", r.pozlama, -100, 100, 1, "", set("pozlama"), "", v => tonCanli("pozlama", v)));
+  t.append(kaydirici("ko", "Kontrast", r.kontrast, -100, 100, 1, "", set("kontrast"), "", v => tonCanli("kontrast", v)));
+  t.append(kaydirici("si", "Sıcaklık", r.sicaklik, -100, 100, 1, "", set("sicaklik"), "", v => tonCanli("sicaklik", v)));
   p.append(t);
   const s = bolum("STİL (Hayal Medya görünümü)");
   const ss = h(`<select aria-label="Stil"><option value="">Kapalı</option>${(S.init.stiller || []).map(x => `<option ${r.stil === x ? "selected" : ""}>${esc(x)}</option>`).join("")}</select>`);

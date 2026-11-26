@@ -66,6 +66,7 @@ class Job:
         self._shape_key = None
         self._shape_maps = None
         self._retouch_key = None
+        self._pre_key = None; self._pre_out = None; self._pre_skin = None   # ışık/renk ve keskinlik öncesi ara sonuç (çubuklar canlı çalışsın diye)
         self._fg_cache = None
         self.edits = []
         self.matte_params = dict(DEFAULT_MATTE)
@@ -479,6 +480,11 @@ class Job:
         key = _key(p)
         if self.Wr is not None and key == self._retouch_key:
             return
+        # yalnızca ışık/renk, stil, keskinlik ve Geri al fırçası değiştiyse ağır adımlar (leke, yumuşatma…) yeniden çalışmaz
+        pre_key = _key({k: v for k, v in p.items() if k not in self._POST_KEYS})
+        if self._pre_key == pre_key and self._pre_out is not None and self.Wr is not None:
+            self._retouch_post(self._pre_out, self._pre_skin, p, key)
+            return
         img = self.W.copy()
         L = self.labels
         iod = self.iod
@@ -614,6 +620,13 @@ class Job:
         if p.get("klon"):
             f = clone_apply(f, p["klon"], iod)
         out = np.clip(f, 0, 255).astype(np.uint8)
+        self._pre_key, self._pre_out, self._pre_skin = pre_key, out, skin_soft
+        self._retouch_post(out, skin_soft, p, key)
+
+    _POST_KEYS = ("sicaklik", "pozlama", "kontrast", "stil", "stil_guc", "oto_beyaz", "keskin", "fircalar")
+
+    def _retouch_post(self, out, skin_soft, p, key):
+        iod = self.iod
         # 7) Işık ve renk (tüm görüntü)
         out = self._tone(out, p)
         # 8) Keskinleştirme (Unsharp Mask)

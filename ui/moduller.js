@@ -80,7 +80,7 @@ function modulCiz() {
     const modSel = h(`<div class="alan"><label>Yerleşim</label><select><option value="sigdir" ${secili.p.mod === "sigdir" ? "selected" : ""}>Kırpmadan sığdır (bulanık dolgu)</option><option value="doldur" ${secili.p.mod === "doldur" ? "selected" : ""}>Alanı doldur (kırp)</option></select></div>`);
     $("select", modSel).onchange = (e) => { secili.p.mod = e.target.value; onizleYenile(secili, 0); };
     b.append(modSel);
-    b.append(kaydirici("mz", "Yakınlaştırma", secili.p.zoom, 0.5, 3, 0.01, "×", set("zoom")));
+    b.append(kaydirici("mz", "Yakınlaştırma", secili.p.zoom, 0.5, 3, 0.01, "×", set("zoom"), "", set("zoom")));
     const dz = h(`<button class="btn genis ana" style="height:44px;font-size:14px" title="Büyük ekranda kaydır, yakınlaştır, renk ayarla">✎ Gelişmiş düzenleme sayfası</button>`);
     dz.onclick = () => duzenAc(M.sec);
     b.append(dz);
@@ -158,7 +158,7 @@ async function duzenAc(idx) {
     $("#dzR", kok).setAttribute("slope", ev * (1 + 0.08 * t)); $("#dzG", kok).setAttribute("slope", ev); $("#dzB", kok).setAttribute("slope", ev * (1 - 0.08 * t));
     ["dzR", "dzG", "dzB"].forEach(i => $("#" + i, kok).setAttribute("intercept", ic));
     const filtre = `url(#dzF) contrast(${1 + (+p.kontrast || 0) / 100 * 0.6}) saturate(${1 + (+p.doygunluk || 0) / 100})`;
-    fg.style.filter = filtre; bg.style.filter = `${filtre} blur(18px) brightness(.92)`;
+    fg.style.filter = filtre; bg.style.filter = `${filtre} blur(60px) saturate(.85) brightness(.92)`;
     $("#dzDurum", kok).textContent = `Yakınlaştırma ×${(+p.zoom).toFixed(2)} · Eğim ${(+p.rot).toFixed(1)}°`;
   };
   const sag = $("#dzSag", kok);

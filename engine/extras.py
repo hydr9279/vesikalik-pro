@@ -59,8 +59,12 @@ def fit_blur(img, W: int, H: int, p: dict | None = None):
     mode = p.get("mod", "sigdir")
     # arka plan: kapsayan boyut + güçlü bulanıklık
     cover = max(W / iw, H / ih)
-    bs = cv2.resize(img, (max(8, int(iw * cover / 8)), max(8, int(ih * cover / 8))), interpolation=cv2.INTER_AREA)
-    bs = cv2.GaussianBlur(bs, (0, 0), 6)
+    # dolgu: çok yumuşak (sert açık-koyu üçgenler oluşmasın) — çok küçük boyutta güçlü bulanıklık + kenar ortalama rengine karışım
+    bs = cv2.resize(img, (max(8, int(iw * cover / 32)), max(8, int(ih * cover / 32))), interpolation=cv2.INTER_AREA)
+    bs = cv2.GaussianBlur(bs, (0, 0), 3, borderType=cv2.BORDER_REPLICATE)
+    ring = np.concatenate([bs[0].reshape(-1, 3), bs[-1].reshape(-1, 3), bs[:, 0].reshape(-1, 3), bs[:, -1].reshape(-1, 3)])
+    ort = ring.astype(np.float32).mean(axis=0)
+    bs = np.clip(bs.astype(np.float32) * 0.45 + ort * 0.55, 0, 255).astype(np.uint8)
     bg = cv2.resize(bs, (int(iw * cover) + 1, int(ih * cover) + 1), interpolation=cv2.INTER_CUBIC)
     y0, x0 = (bg.shape[0] - H) // 2, (bg.shape[1] - W) // 2
     bg = bg[y0:y0 + H, x0:x0 + W].astype(np.float32) * 0.92

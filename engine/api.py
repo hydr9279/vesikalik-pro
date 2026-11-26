@@ -256,7 +256,7 @@ class Api:
                 j.retouch_params.update({"leke": 0, "yumusatma": 0, "parlama": 0, "gozalti": 0})
                 j.retouch(self._p)
                 j.retouch_params.update({k: DEFAULT_RETOUCH[k] for k in ("leke", "yumusatma", "parlama", "gozalti")})
-                j._retouch_key = None
+                j._retouch_key = None; j._pre_key = None
             j.rebuild_alpha()
             self._p(0.95, "Görüntü hazırlanıyor")
             return self._state(j, fid)
@@ -523,6 +523,37 @@ class Api:
             return {"gorsel": self._view(self._jobs[jid], fid, mode)}
         return self._safe(go)
 
+    def bg_onizle(self, jid, fid, bg):
+        """Canlı önizleme (fon çubukları)."""
+        def go():
+            j = self._jobs[jid]
+            j.bg.update(bg)
+            return {"gorsel": self._view(j, fid, hizli=True)}
+        return self._safe(go)
+
+    def matte_onizle(self, jid, fid, params):
+        """Canlı önizleme (kenar çubukları)."""
+        def go():
+            j = self._jobs[jid]
+            j.matte_params.update(params)
+            j.rebuild_alpha()
+            return {"gorsel": self._view(j, fid, hizli=True)}
+        return self._safe(go)
+
+    def rotus_onizle(self, jid, fid, params):
+        """Canlı önizleme (rötuş çubukları)."""
+        def go():
+            j = self._jobs[jid]
+            p = dict(params)
+            for k in ("spots", "geri_al", "fircalar", "koruma_fircalar", "klon", "pro_ornekler", "manuel"):
+                p.pop(k, None)
+            if "pro" in p:
+                p["pro"] = {**(p["pro"] or {}), "ornekler": (j.retouch_params.get("pro") or {}).get("ornekler", [])}
+            j.retouch_params.update(p)
+            j.retouch(lambda *a, **k: None)
+            return {"gorsel": self._view(j, fid, hizli=True)}
+        return self._safe(go)
+
     def set_bg(self, jid, fid, bg):
         def go():
             j = self._jobs[jid]
@@ -592,6 +623,14 @@ class Api:
             r = e["r"] * Wc / s / j.W.shape[1]
             j.shape_ops.append({"t": e["tur"], "pts": pts, "r": r, "guc": float(e.get("guc", 0.6))})
             return self._state(j, fid)
+        return self._safe(go)
+
+    def omuz_onizle(self, jid, fid, miktar):
+        """Canlı önizleme (omuz hizalama çubuğu)."""
+        def go():
+            j = self._jobs[jid]
+            j.omuz = float(miktar)
+            return {"gorsel": self._view(j, fid, hizli=True)}
         return self._safe(go)
 
     def sekil_onizle(self, jid, fid, e):
