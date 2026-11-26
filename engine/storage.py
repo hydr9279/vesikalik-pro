@@ -35,6 +35,7 @@ def _default_settings() -> dict:
         "kamera_klasoru": "",
         "kamera_izle": False,
         "tekli_jpg": True,
+        "son_kontrol": True,
         "hizli_mod": False,
         "gpu_kullan": True,
         "sablon_goster": True,

@@ -795,6 +795,33 @@ class Api:
             pass
         return {"ok": True}
 
+    def sorun_bildir(self):
+        """Hata kayıtları + (şifresiz) ayarlar + sistem bilgisi tek zip. Fotoğraf İÇERMEZ. Masaüstüne kaydedilir."""
+        def go():
+            import platform, zipfile, json as _j
+            desk = os.path.join(os.path.expanduser("~"), "Desktop")
+            if not os.path.isdir(desk):
+                desk = os.path.expanduser("~")
+            p = os.path.join(desk, f"VesikalikPro_sorun_raporu_{datetime.datetime.now():%Y%m%d_%H%M}.zip")
+            info = {"surum": VERSION, "sistem": platform.platform(), "python": platform.python_version(),
+                    "donanim": models.provider_info(), "saglayicilar": models.available_providers(),
+                    "modeller": {k: models.has_model(k) for k in models.MODELS}}
+            with zipfile.ZipFile(p, "w", zipfile.ZIP_DEFLATED) as z:
+                z.writestr("sistem_bilgisi.json", _j.dumps(info, ensure_ascii=False, indent=2, default=str))
+                z.writestr("ayarlar.json", _j.dumps(storage.public_settings(), ensure_ascii=False, indent=2, default=str))
+                ld = log_dir()
+                if os.path.isdir(ld):
+                    for f in sorted(os.listdir(ld))[-14:]:
+                        fp = os.path.join(ld, f)
+                        if os.path.isfile(fp):
+                            z.write(fp, "kayitlar/" + f)
+            try:
+                os.startfile(os.path.dirname(p))
+            except Exception:
+                pass
+            return {"yol": p}
+        return self._safe(go)
+
     def open_logs(self):
         return self.open_folder(log_dir())
 

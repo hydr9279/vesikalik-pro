@@ -893,9 +893,29 @@ function panelBaski(p) {
   btn.append(b1, b2);
   p.append(btn);
 }
-async function kaydet(yazdir) {
+function sonKontrol(onay) {
+  const ad = $("#sAd")?.value.trim(), yz = $("#sYz")?.value, kop = +($("#sKop")?.value || 1);
+  const uyg = (S.st?.uygunluk || []).filter(c => c.durum !== "ok");
+  const sat = [
+    [!!ad, "Müşteri adı", ad || "Girilmemiş (dosya adında boş kalır)"],
+    [true, "Adet", `${S.bilgi.adet} fotoğraf · ${kop} kopya`],
+    [!!yz, "Yazıcı", yz || "Seçilmemiş"],
+    [!uyg.length, "Uygunluk", uyg.length ? uyg.map(c => c.ad).join(", ") : "Tüm kurallar uygun"],
+  ];
+  const ic = h(`<div class="modal-ic"><div style="display:flex;gap:16px;align-items:flex-start"><img src="${S.sayfa?.sayfa || ""}" style="max-height:340px;max-width:46%;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.35)" alt="Baskı önizlemesi"><ul class="uyg" style="flex:1"></ul></div>
+    <label class="secim">Bir daha gösterme<input type="checkbox" id="skSorma"></label>
+    <div class="satir" style="justify-content:flex-end"><button class="btn">Geri dön</button><button class="btn ana">Yazdır</button></div></div>`);
+  sat.forEach(([ok, a, v]) => $("ul", ic).append(h(`<li><span class="d ${ok ? "ok" : "uyari"}">${ok ? "✓" : "!"}</span><span class="a">${esc(a)}</span><span class="v">${esc(v)}</span></li>`)));
+  const [g, y] = $$("button", ic);
+  g.onclick = kapat;
+  y.onclick = async () => { if ($("#skSorma", ic).checked) { S.ayar.son_kontrol = false; await api.update_settings({son_kontrol: false}); } kapat(); onay(); };
+  modal("Baskı öncesi son kontrol", ic, true);
+}
+
+async function kaydet(yazdir, kontrolsuz = false) {
   const klasor = $("#sKl").value.trim();
   if (!klasor) { bildir("Önce kayıt klasörünü seçin.", true); return; }
+  if (yazdir && !kontrolsuz && S.ayar.son_kontrol !== false) { sonKontrol(() => kaydet(yazdir, true)); return; }
   S.bilgi.no = $("#sNo").value.trim(); S.bilgi.musteri = $("#sAd").value.trim(); S.kayitKlasor = klasor;
   const r = await cagir("save", S.cur, S.fid, {klasor, no: S.bilgi.no, adet: S.bilgi.adet, musteri: S.bilgi.musteri, tekli: S.ayar.tekli_jpg !== false,
     online: !!S.online, yazdir, yazici: $("#sYz")?.value, kopya: +($("#sKop")?.value || 1)});
@@ -1022,7 +1042,12 @@ async function ayarlar(sekme = "genel") {
     g.append(b);
   } else {
     g.append(h(`<div class="not">Bir sorun olursa program günlük hata kaydı tutar. Klasörü açıp ilgili günün dosyasını gönderin; sorunun nedeni hızla bulunur.</div>`));
-    const b = h(`<button class="btn">Hata kayıtları klasörünü aç</button>`); b.onclick = () => api.open_logs(); g.append(b);
+    const b = h(`<div class="satir"><button class="btn">Hata kayıtları klasörünü aç</button><button class="btn ana">Sorun bildir (rapor oluştur)</button></div>`);
+    const [b1, b2] = $$("button", b);
+    b1.onclick = () => api.open_logs();
+    b2.onclick = async () => { const r = await cagir("sorun_bildir"); if (r.ok) bildir("Rapor masaüstüne kaydedildi: " + r.yol.split(/[\\/]/).pop()); };
+    g.append(b);
+    g.append(h(`<div class="not">Rapor; hata kayıtlarını, ayarları (şifresiz) ve ekran kartı bilgisini içerir. <b>Müşteri fotoğrafı içermez.</b> Oluşan zip dosyasını bana gönderin.</div>`));
   }
   modal("Ayarlar", ic);
 }
