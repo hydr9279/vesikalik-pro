@@ -613,9 +613,6 @@ class Job:
         # 6c) Klon damgası
         if p.get("klon"):
             f = clone_apply(f, p["klon"], iod)
-        if p.get("fircalar"):
-            rs = self._stroke_mask(p["fircalar"])[..., None]
-            f = f * (1 - rs) + self.W.astype(np.float32) * rs
         out = np.clip(f, 0, 255).astype(np.uint8)
         # 7) Işık ve renk (tüm görüntü)
         out = self._tone(out, p)
@@ -624,7 +621,11 @@ class Job:
         if ks.get("miktar", 0) > 0:
             out = unsharp(out, ks, iod, skin_soft)
         if self.manuel_rgb is not None and self.manuel_m is not None and self.manuel_rgb.shape == out.shape:
-            out = np.where(self.manuel_m[..., None], self.manuel_rgb, out)   # manuel rötuş yaması (son katman)
+            out = np.where(self.manuel_m[..., None], self.manuel_rgb, out)   # manuel rötuş yaması
+        if p.get("fircalar"):   # Geri al fırçası: EN SON katman. Yapılan her işlemi (klon, manuel yama dahil) opaklığa göre azaltır
+            rs = self._stroke_mask(p["fircalar"])[..., None]
+            hedef = self._tone(self.W.copy(), p).astype(np.float32)
+            out = np.clip(out.astype(np.float32) * (1 - rs) + hedef * rs, 0, 255).astype(np.uint8)
         self.Wr = out
         self._retouch_key = key
         self._fg_cache = None

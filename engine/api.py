@@ -162,6 +162,10 @@ class Api:
             except Exception:
                 pass
             s = storage.public_settings()
+            try:
+                models.isit()
+            except Exception:
+                pass
             return {"surum": VERSION, "ad": APP_NAME, "formatlar": public_formats(), "degradeler": GRADIENTS,
                     "ayarlar": s, "stiller": list_styles(), "yazicilar": self._yazicilar(),
                     "varsayilanlar": {"rotus": DEFAULT_RETOUCH, "matte": DEFAULT_MATTE, "bg": DEFAULT_BG, "geom": DEFAULT_GEOM},
@@ -363,7 +367,7 @@ class Api:
                 var = os.path.exists(yol)
                 from .paths import extra_model_dir
                 out.append({"key": k, "ad": m["ad"], "var": var, "lisans": m["lisans"], "ticari": m["ticari"],
-                            "not": m.get("not", ""), "agir": bool(m.get("agir")), "ek": bool(m.get("ek")),
+                            "not": m.get("not", ""), "detay": m.get("detay", ""), "iyi": m.get("iyi", ""), "hiz": m.get("hiz", ""), "oner": m.get("oner", ""), "agir": bool(m.get("agir")), "ek": bool(m.get("ek")),
                             "mb": round(os.path.getsize(yol) / 1e6) if var else 0, "kapali": k in kapali,
                             "kaldirilabilir": var and os.path.dirname(yol) == extra_model_dir()})
             return {"modeller": out}
@@ -663,6 +667,23 @@ class Api:
             return self._state(j, fid)
         return self._safe(go)
 
+    def spot_toplu(self, jid, fid, pts, r=0.012):
+        """Leke fırçası (toplu): birden çok nokta tek seferde işlenir."""
+        def go():
+            j = self.jobs[jid]
+            M, (Wc, Hc), ppm, s2 = j.transform(self._fmt(fid), EDIT_MULT)
+            for x, y in pts:
+                wx, wy, s = self._to_work(j, fid, x, y)
+                near = [p for p in j.spots_found if abs(p[0] - wx) < 0.01 and abs(p[1] - wy) < 0.01]
+                if near:
+                    j.retouch_params.setdefault("geri_al", []).append([wx, wy])
+                else:
+                    j.retouch_params.setdefault("spots", []).append([wx, wy, r * Wc / s2 / j.W.shape[1]])
+            self._p(0.4, f"{len(pts)} leke onarılıyor")
+            j.retouch(self._p)
+            return self._state(j, fid)
+        return self._safe(go)
+
     def learn_style(self, name, pairs):
         def go():
             self._p(0.2, "Stil öğreniliyor")
@@ -820,6 +841,21 @@ class Api:
             elif is_image(p):
                 out.append({"yol": p, "ad": os.path.basename(p)})
         return out
+
+    def modul_resim(self, tur, path, paper="10x15"):
+        """Düzenleme sayfası için: tam kare/kağıt oranı ve anlık önizleme kaynağı (büyük küçültülmüş fotoğraf)."""
+        def go():
+            img = self._mimg(path)
+            ih, iw = img.shape[:2]
+            if tur == "polaroid":
+                W = H = extras.PHOTO_PX
+            else:
+                pw, ph = extras.PAPERS.get(paper, extras.PAPERS["10x15"])
+                W, H = extras.mm(pw), extras.mm(ph)
+                if iw > ih:
+                    W, H = H, W
+            return {"gorsel": to_b64(img, max_side=1600, quality=90), "iw": iw, "ih": ih, "cw": int(W), "ch": int(H)}
+        return self._safe(go)
 
     def modul_onizle(self, tur, path, params, paper="10x15"):
         def go():

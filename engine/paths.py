@@ -3,7 +3,7 @@ import os
 import sys
 
 APP_NAME = "Hayal Medya Vesikalık Pro"
-VERSION = "1.4.2"
+VERSION = "1.4.3"
 
 
 def app_dir() -> str:

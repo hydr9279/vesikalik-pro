@@ -17,7 +17,7 @@ window.onerror = (m, s, l) => { try { api.log_js_error(`${m} @${l}`); } catch (e
 const ADIMLAR = ["Başlangıç", "Arka Plan", "Rötuş", "Ölçekleme", "Baskı ve Kayıt"];
 const S = {
   init: null, fmt: {}, fid: "bio56", adim: 0, isler: [], cur: null, st: null, gorunum: "sonuc", arac: "sam+",
-  firca: 40, bilgi: {musteri: "", no: "", adet: 4}, ayar: {}, karsilastir: 50, lekeArac: false, sayfa: null, rArac: "k", sGuc: 60, rVal: 70, kHard: 40, kVal: 100, kSrc: null, rGor: "sonuc", seciliLeke: -1,
+  firca: 40, bilgi: {musteri: "", no: "", adet: 4}, ayar: {}, karsilastir: 50, lekeArac: false, sayfa: null, rArac: "k", sGuc: 60, rVal: 70, kHard: 40, kVal: 100, kSrc: null, rGor: "sonuc", seciliLeke: -1, bLeke: {},
 };
 
 // ------------------------------------------------------------------ meşgul / ilerleme
@@ -138,7 +138,7 @@ function ekle(r) {
   if (!S.cur && S.isler.length) isSec(S.isler[0].id); else ciz();
 }
 async function isSec(id) {
-  S.cur = id; S.adim = 0; S.st = null; S.sayfa = null;
+  S.ana = false; S.cur = id; S.adim = 0; S.st = null; S.sayfa = null;
   ciz();
   await analiz();
 }
@@ -168,6 +168,7 @@ async function hizliMod() {
 // ------------------------------------------------------------------ adım geçişleri
 async function adimaGit(i) {
   if (i > 0 && !S.cur) return;
+  S.ana = false;
   if (i >= 1 && !isBul(S.cur).maskeli) { if (!(await maskeHazirla())) return; }
   if (i >= 2 && !isBul(S.cur).rotuslu) await rotusUygula();
   S.adim = i;
@@ -211,7 +212,7 @@ function sahneCiz() {
 
 function girisCiz(sh) {
   const g = h(`<div class="giris"></div>`);
-  if (S.cur && S.st) {
+  if (S.cur && S.st && !S.ana) {
     const j = isBul(S.cur);
     g.append(h(`<div class="satir" style="gap:24px;align-items:flex-start;height:100%">
       <img src="${S.st.orijinal}" style="max-height:100%;max-width:60%;border-radius:8px;box-shadow:0 10px 40px rgba(0,0,0,.4)">
@@ -247,6 +248,7 @@ function girisCiz(sh) {
   sh.append(g);
 }
 async function turSec(id) {
+  S.ana = false;
   S.fid = id;
   const f = S.fmt[id];
   if (!f.adetler.includes(S.bilgi.adet)) S.bilgi.adet = f.adetler[0];
@@ -370,10 +372,11 @@ function arkaplanTuval(sh, alan, ic, kat, norm) {
 function rotusTuval(sh, alan, ic, kat, norm, ana) {
   const svgNS = "http://www.w3.org/2000/svg";
   const A = S.rArac || "k";
-  const T = (k, ad, ip) => `<button class="arac ${A === k ? "secili" : ""}" data-a="${k}" title="${ip}">${ad}</button>`;
+  const T = (k, ik, ad, ip) => `<button class="arac-d ${A === k ? "secili" : ""}" data-a="${k}" title="${esc(ad + " — " + ip)}"><span>${ik}</span><small>${ad}</small></button>`;
   const fs = S.st.firca_sayisi || [0, 0];
-  const ar = h(`<div class="araclar">${T("k", "Karşılaştır", "Önce / sonra sürgüsü: fotoğrafın önceki ve sonraki hâlini yan yana kaydırarak görün")}<span class="arac-ayrac"></span>${T("l", "Leke fırçası", "Tıklanan yeri leke olarak temizler (L)")}${T("g", "Geri al fırçası", "Rötuşu fırçayla yüzdelik olarak siler, orijinale döndürür (G)")}${T("p", "Koruma fırçası", "Fırçayla boyanan yer rötuştan korunur (P)")}<span class="arac-ayrac"></span>${T("n", "Klon damgası", "Alt + tıkla: kaynak seç, sonra boyayarak kopyala (S)")}${T("t", "Ten örneği", "Gelişmiş portre rötuşu için ten rengi örneği seç (T)")}<span class="arac-ayrac"></span>${T("m", "İt / çek", "Omuz ve giysi kenarını fırçayla it (M). Yüz kilitlidir")}${T("b", "Şişir", "Fırçanın altını büyüt (B). Yüz kilitlidir")}${T("z", "Küçült", "Fırçanın altını küçült (Z). Yüz kilitlidir")}<span class="arac-ayrac"></span><button class="arac ${S.lekeGoster ? "secili" : ""}" data-a="x" title="Bulunan lekeleri göster/gizle">Lekeleri göster</button><button class="arac ${S.rGor === "koruma" ? "secili" : ""}" data-a="v" title="Rötuşun dokunmadığı bölgeleri yeşil gösterir (K)">Koruma haritası</button><button class="arac" data-a="u" title="Son fırça darbesini geri al">↶ Fırça geri al</button><button class="arac" data-a="us" title="Son şekillendirme darbesini geri al">↶ Şekil geri al${S.st.sekil_sayisi ? " (" + S.st.sekil_sayisi + ")" : ""}</button><button class="arac" data-a="uk" title="Son klon darbesini geri al">↶ Klon geri al${S.st.klon_sayisi ? " (" + S.st.klon_sayisi + ")" : ""}</button></div>`);
-  $$(".arac", ar).forEach(b => b.onclick = async () => {
+  const bl = (S.bLeke[S.cur] || []).length;
+  const ar = h(`<div class="dikey-arac">${T("k", "◧", "Karşılaştır", "Önce / sonra sürgüsü: fotoğrafın önceki ve sonraki hâlini yan yana kaydırarak görün")}<i></i>${T("l", "✦", "Leke", "Lekelerin üzerine tıklayarak nokta ekleyin, sonra Uygula ile hepsini birlikte temizleyin (L)")}${T("g", "↺", "Geri al", "Yaptığınız her işlemi fırçayla, opaklık ayarı kadar siler; fotoğraf orijinale döner (G)")}${T("p", "◈", "Koruma", "Fırçayla boyanan yer rötuştan korunur (P)")}<i></i>${T("n", "◎", "Klon", "Alt + tıkla: kaynak seç, sonra boyayarak kopyala (S)")}${T("t", "◉", "Ten örneği", "Gelişmiş portre rötuşu için ten rengi örneği seç (T)")}<i></i>${T("m", "↔", "İt / çek", "Omuz ve giysi kenarını fırçayla it (M). Yüz kilitlidir")}${T("b", "⊕", "Şişir", "Fırçanın altını büyüt (B). Yüz kilitlidir")}${T("z", "⊖", "Küçült", "Fırçanın altını küçült (Z). Yüz kilitlidir")}<i></i><button class="arac-d ${S.lekeGoster ? "secili" : ""}" data-a="x" title="Lekeleri göster — Bulunan lekeleri nokta olarak göster/gizle"><span>◌</span><small>Lekeleri göster</small></button><button class="arac-d ${S.rGor === "koruma" ? "secili" : ""}" data-a="v" title="Koruma haritası — Rötuşun dokunmadığı bölgeleri yeşil gösterir (K)"><span>▦</span><small>Koruma haritası</small></button><i></i><button class="arac-d" data-a="u" title="Fırça geri al — Son fırça darbesini geri al"><span>↶</span><small>Fırça${fs[0] ? " (" + fs[0] + ")" : ""}</small></button><button class="arac-d" data-a="us" title="Şekil geri al — Son şekillendirme darbesini geri al"><span>↶</span><small>Şekil${S.st.sekil_sayisi ? " (" + S.st.sekil_sayisi + ")" : ""}</small></button><button class="arac-d" data-a="uk" title="Klon geri al — Son klon darbesini geri al"><span>↶</span><small>Klon${S.st.klon_sayisi ? " (" + S.st.klon_sayisi + ")" : ""}</small></button></div>`);
+  $$(".arac-d", ar).forEach(b => b.onclick = async () => {
     const a = b.dataset.a;
     if (a === "x") S.lekeGoster = !S.lekeGoster;
     else if (a === "v") { S.rGor = S.rGor === "koruma" ? "sonuc" : "koruma"; S.st.gorsel_koruma = null; }
@@ -385,11 +388,19 @@ function rotusTuval(sh, alan, ic, kat, norm, ana) {
   });
   sh.append(ar);
   if (A === "g" || A === "p") {
-    const ab = h(`<div class="araclar alt-y"><label>Fırça boyutu <input type="range" min="6" max="160" value="${S.firca}" id="rfb"> <b>${S.firca}</b></label>${A === "g" ? `<label>Geri alma gücü <input type="range" min="5" max="100" value="${S.rVal}" id="rfv"> <b>%${S.rVal}</b></label>` : ""}</div>`);
+    const ab = h(`<div class="araclar alt-y"><label>Fırça boyutu <input type="range" min="6" max="160" value="${S.firca}" id="rfb"> <b>${S.firca}</b></label>${A === "g" ? `<label>Opaklık <input type="range" min="5" max="100" value="${S.rVal}" id="rfv"> <b>%${S.rVal}</b></label><span class="not" style="margin:0">Fırçayla geçtiğiniz yerde yapılan işlemler bu oranda silinir</span>` : ""}</div>`);
     $("#rfb", ab).oninput = (e) => { S.firca = +e.target.value; $("b", e.target.parentNode).textContent = S.firca; };
     if ($("#rfv", ab)) $("#rfv", ab).oninput = (e) => { S.rVal = +e.target.value; $("b", e.target.parentNode).textContent = "%" + S.rVal; };
     sh.append(ab);
   }
+  if (A === "l") {
+    const ab = h(`<div class="araclar alt-y"><span class="not" style="margin:0">Lekelerin üzerine <b>tıklayarak nokta ekleyin</b>, bitince <b>Uygula</b></span><b id="lSay">${bl} nokta</b><button class="btn kucuk" id="lGeri" ${bl ? "" : "disabled"} title="Son eklenen noktayı kaldır">↶ Son noktayı sil</button><button class="btn kucuk" id="lTemiz" ${bl ? "" : "disabled"} title="Eklenen tüm noktaları kaldır">Temizle</button><button class="btn ana kucuk" id="lUygula" ${bl ? "" : "disabled"} title="Eklenen tüm noktaları birlikte temizle">Uygula (${bl})</button></div>`);
+    $("#lGeri", ab).onclick = () => { S.bLeke[S.cur].pop(); sahneCiz(); };
+    $("#lTemiz", ab).onclick = () => { S.bLeke[S.cur] = []; sahneCiz(); };
+    $("#lUygula", ab).onclick = async () => { const pts = S.bLeke[S.cur] || []; if (!pts.length) return; const r = await cagir("spot_toplu", S.cur, S.fid, pts); if (r.ok) { S.bLeke[S.cur] = []; S.st = {...r, gorsel_once: S.st.gorsel_once, gorsel_koruma: null}; sahneCiz(); panelCiz(); } };
+    sh.append(ab);
+  }
+  (S.bLeke[S.cur] || []).forEach(([x, y], i) => kat.append(h(`<span class="leke-bekleyen" style="left:${x * 100}%;top:${y * 100}%" title="Uygula ile işlenecek nokta ${i + 1}"></span>`)));
   if (A === "n") {
     const nb = h(`<div class="araclar alt-y"><label>Fırça boyutu <input type="range" min="6" max="200" value="${S.firca}" id="nfb"> <b>${S.firca}</b></label><label>Kenar yumuşaklığı <input type="range" min="0" max="100" value="${100 - S.kHard}" id="nfy"> <b>%${100 - S.kHard}</b></label><label>Opaklık <input type="range" min="5" max="100" value="${S.kVal}" id="nfo"> <b>%${S.kVal}</b></label><span class="not" style="margin:0">${S.kSrc ? "Kaynak seçili ✓" : "Önce <b>Alt + tıkla</b> ile kaynağı seçin"}</span></div>`);
     $("#nfb", nb).oninput = (e) => { S.firca = +e.target.value; $("b", e.target.parentNode).textContent = S.firca; };
@@ -430,11 +441,10 @@ function rotusTuval(sh, alan, ic, kat, norm, ana) {
     kat.append(m);
   });
   // leke ekleme (yalnızca Leke fırçası aracında, boş yere tıklayınca)
-  if (A === "l") alan.addEventListener("mousedown", async (e) => {
+  if (A === "l") alan.addEventListener("mousedown", (e) => {   // yalnız nokta ekler; işlem "Uygula" ile toplu yapılır
     if (e.button !== 0 || bosluk) return;
-    const [x, y] = norm(e);
-    const r = await cagir("spot", S.cur, S.fid, x, y);
-    if (r.ok) guncelle(r);
+    const [x, y] = norm(e); if (x < 0 || y < 0 || x > 1 || y > 1) return;
+    (S.bLeke[S.cur] = S.bLeke[S.cur] || []).push([x, y]); sahneCiz();
   });
   if (A === "t") alan.addEventListener("mousedown", async (e) => {
     if (e.button !== 0 || bosluk) return;
@@ -530,18 +540,28 @@ function olcekTuval(sh, alan, ic, kat, norm) {
   sh.append(ar);
   sh.append(h(`<div class="efsane"><span>Sürükle: taşı · Tekerlek: ölçek · Ok tuşları: 0,1 mm · [ ]: eğim · Ctrl+tekerlek: ekran yakınlığı</span></div>`));
   let sur = null;
-  alan.addEventListener("mousedown", (e) => {
+  const surBitir = () => {
+    if (!sur) return;
+    const x = sur; sur = null;
+    ic.querySelector("img")?.style && (ic.querySelector("img").style.cursor = "");
+    if (x.nx != null) geomDegis({dx: +x.nx.toFixed(2), dy: +x.ny.toFixed(2)});
+  };
+  alan.addEventListener("pointerdown", (e) => {
     if (e.button !== 0 || bosluk) return;
     const r = ic.getBoundingClientRect();
-    sur = {x: e.clientX, y: e.clientY, dx: S.st.geom.dx, dy: S.st.geom.dy, k: f.gen_mm / r.width};
+    sur = {x: e.clientX, y: e.clientY, dx: S.st.geom.dx, dy: S.st.geom.dy, k: f.gen_mm / r.width, id: e.pointerId};
+    try { alan.setPointerCapture(e.pointerId); } catch (_) {}   // fare alandan çıksa bile bırakma yakalanır
   });
-  alan.addEventListener("mousemove", (e) => {
+  alan.addEventListener("pointermove", (e) => {
     if (!sur) return;
+    if (e.buttons === 0) { surBitir(); return; }   // düğme zaten bırakılmışsa sürüklemeyi bitir
     const nx = sur.dx + (e.clientX - sur.x) * sur.k, ny = sur.dy + (e.clientY - sur.y) * sur.k;
     ic.querySelector("img").style.transform = `translate(${(nx - S.st.geom.dx) / f.gen_mm * 100}%, ${(ny - S.st.geom.dy) / f.yuk_mm * 100}%)`;
     sur.nx = nx; sur.ny = ny;
   });
-  window.addEventListener("mouseup", () => { if (sur && sur.nx != null) geomDegis({dx: +sur.nx.toFixed(2), dy: +sur.ny.toFixed(2)}); sur = null; }, {once: true});
+  alan.addEventListener("pointerup", surBitir);
+  alan.addEventListener("pointercancel", surBitir);
+  alan.addEventListener("lostpointercapture", surBitir);
 }
 let geomT = null, geomBekleyen = {};
 function geomDegis(d) {
@@ -772,7 +792,7 @@ function panelRotus(p) {
     const x = await rotusUygula(v); if (x.ok) { sahneCiz(); panelCiz(); }
   };
   pr.append(sel);
-  const mrt = h(`<button class="btn kucuk genis ana" title="Photoshop benzeri klon damgası, yama ve nokta iyileştirme: her vuruş anında etki eder">✎ Manuel rötuş ekranı${S.st.manuel_var && S.st.manuel_var[0] ? " ●" : ""}</button>`);
+  const mrt = h(`<button class="btn genis ana manuel-buyuk" title="Photoshop benzeri klon damgası, yama, iyileştirme, parlama gider ve daha fazlası: her vuruş anında etki eder"><span style="font-size:22px">✎</span><span style="display:flex;flex-direction:column;align-items:flex-start;line-height:1.2"><b style="font-size:15px">Manuel rötuş ekranı</b><small style="font-weight:500;opacity:.85">Photoshop benzeri araçlar${S.st.manuel_var && S.st.manuel_var[0] ? " · düzenleme var ●" : ""}</small></span></button>`);
   mrt.onclick = () => manuelAc("rotus");
   pr.append(mrt);
   const pb = h(`<div class="satir"><button class="btn kucuk genis">Profili kaydet</button></div>`);
@@ -924,8 +944,12 @@ function sonKontrol(onay) {
 }
 
 async function kaydet(yazdir, kontrolsuz = false) {
-  const klasor = $("#sKl").value.trim();
-  if (!klasor) { bildir("Önce kayıt klasörünü seçin.", true); return; }
+  let klasor = $("#sKl").value.trim();
+  if (!klasor) {   // uyarı yerine doğrudan klasör seçtir
+    const k = await api.pick_folder(S.ayar.varsayilan_klasor || "");
+    if (!k) return;
+    klasor = k; $("#sKl").value = k; S.kayitKlasor = k;
+  }
   if (yazdir && !kontrolsuz && S.ayar.son_kontrol !== false) { sonKontrol(() => kaydet(yazdir, true)); return; }
   S.bilgi.no = $("#sNo").value.trim(); S.bilgi.musteri = $("#sAd").value.trim(); S.kayitKlasor = klasor;
   const r = await cagir("save", S.cur, S.fid, {klasor, no: S.bilgi.no, adet: S.bilgi.adet, musteri: S.bilgi.musteri, tekli: S.ayar.tekli_jpg !== false,
@@ -936,6 +960,15 @@ async function kaydet(yazdir, kontrolsuz = false) {
   siraCiz(); altCiz(); panelCiz();
   bildir(`Kaydedildi${r.yazdirildi ? " ve yazıcıya gönderildi" : ""}: ${Object.keys(r.dosyalar).length} dosya`, false, {ad: "Klasörü aç", fn: () => api.open_folder(klasor)});
 }
+
+// ------------------------------------------------------------------ ana menü
+function anaMenu() {
+  try { kapat(); } catch (_) {}
+  try { modulKapat(); } catch (_) {}
+  if (MV && MV.acik) return;   // manuel ekran açıkken önce Uygula/İptal
+  S.ana = true; S.adim = 0; ciz();
+}
+document.addEventListener("keydown", (e) => { if (e.altKey && e.key === "Home") { e.preventDefault(); anaMenu(); } });
 
 // ------------------------------------------------------------------ geri al
 async function geriAl() {
@@ -1084,7 +1117,7 @@ async function ayarlar(sekme = "genel") {
     g.append(h(`<div class="not">Yapay zeka modelleri bu bilgisayarda çalışır, internet gerekmez. "Ek model paketi"ndeki .onnx dosyalarını <b>İçe aktar</b> ile ekleyin. Ticari olmayan lisanslı modellerin sorumluluğu kullanıcıya aittir.</div>`));
     const t = h(`<table class="liste"><thead><tr><th>Model</th><th>Lisans</th><th>Boyut</th><th>Durum</th><th></th></tr></thead><tbody></tbody></table>`);
     ml.forEach(x => {
-      const tr = h(`<tr><td><b>${esc(x.ad)}</b><div class="not" style="margin:0">${esc(x.not)}</div></td><td>${esc(x.lisans)}${x.ticari ? "" : ` <span class="rozet gri">Ticari değil</span>`}</td><td>${x.var ? x.mb + " MB" : "—"}</td><td>${x.var ? (x.kapali ? "Kapalı" : "Hazır") : "Yüklü değil"}</td><td style="white-space:nowrap"></td></tr>`);
+      const tr = h(`<tr><td><b>${esc(x.ad)}</b><div class="not" style="margin:2px 0 6px">${esc(x.not)}</div>${x.detay ? `<div class="model-detay"><p>${esc(x.detay)}</p><p><b>İyi olduğu yer:</b> ${esc(x.iyi)}</p><p><b>Hız:</b> ${esc(x.hiz)}</p><p class="oner"><b>Öneri:</b> ${esc(x.oner)}</p></div>` : ""}</td><td>${esc(x.lisans)}${x.ticari ? "" : ` <span class="rozet gri">Ticari değil</span>`}</td><td>${x.var ? x.mb + " MB" : "—"}</td><td>${x.var ? (x.kapali ? "Kapalı" : "Hazır") : "Yüklü değil"}</td><td style="white-space:nowrap"></td></tr>`);
       const td = tr.lastElementChild;
       if (x.var) { const b = h(`<button class="btn kucuk">${x.kapali ? "Aç" : "Kapat"}</button>`); b.onclick = async () => { await api.model_kapat(x.key, !x.kapali); ayarlar("modeller"); }; td.append(b); }
       if (x.kaldirilabilir) { const b = h(`<button class="btn kucuk tehlike">Kaldır</button>`); b.onclick = async () => { await api.model_kaldir(x.key); ayarlar("modeller"); }; td.append(b); }
@@ -1170,8 +1203,10 @@ function hakkinda() {
     <div style="font-weight:700;letter-spacing:.03em">HAYDAR ALTINSABAN yapımıdır · Tüm hakları saklıdır</div>
     <div class="not">HAYAL MEDYA · 0312 264 0 888 &nbsp;·&nbsp; Haydar Altınsaban · 0554 990 49 59</div></div>
     <div class="modal-ic">
-    <h3 style="margin:0;font-size:13px;color:var(--soluk);letter-spacing:.08em">SÜRÜM NOTLARI · 1.4.2</h3>
+    <h3 style="margin:0;font-size:13px;color:var(--soluk);letter-spacing:.08em">SÜRÜM NOTLARI · 1.4.3</h3>
     <ul class="not" style="margin:0;padding-left:18px;line-height:1.7;color:var(--yazi)">
+      <li><b>Yeni (1.4.3):</b> Her ekranda Ana menü düğmesi; Polaroid ve Serbest Baskı'da fotoğrafa çift tıklayınca tam sayfa düzenleme (kaydır, yakınlaştır, renk, sıfırla).</li>
+      <li><b>Yeni (1.4.3):</b> Leke fırçası toplu "Uygula"; Geri al fırçası opaklıklı ve en son katmanda; rötuş araçları sol sütunda; kayıt klasörü sorulur; modeller için ayrıntılı açıklamalar; ölçekleme sürükleme hatası giderildi.</li>
       <li><b>Yeni (1.4.2):</b> Manuel rötuşta Photoshop tarzı Yama (serbest çizim seçim, Kaynak/Hedef, Yayılım), sağ tıkla fırça boyutu ve sertlik penceresi, Akış ayarı; yeni araçlar: İyileştirme fırçası, Orijinale döndür, Parlama gider, Aydınlat, Karart, Göz/diş beyazlat, küçük harita.</li>
       <li><b>Yeni (1.4.2):</b> Açılış ekranında durum yazısı; yükleme ekranı ayrı işlemde çalışır, açılışta donma giderildi.</li>
       <li><b>Yeni (1.4):</b> Açılış animasyonu ve tek pencere kilidi: çift tıklayınca hemen yükleniyor penceresi görünür, tekrar tıklamak gerekmez, uygulama bir kez açılır.</li>
@@ -1239,6 +1274,7 @@ async function kameraYokla() {
 
 // ------------------------------------------------------------------ olaylar
 $("#btnEkle").onclick = dosyaEkle;
+$("#btnAna").onclick = anaMenu;
 $("#btnAyar").onclick = () => ayarlar();
 $("#btnArsiv").onclick = () => arsiv();
 $("#btnHakkinda").onclick = hakkinda;

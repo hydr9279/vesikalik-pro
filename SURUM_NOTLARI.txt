@@ -2,6 +2,17 @@
 HAYDAR ALTINSABAN yapımıdır · Tüm hakları saklıdır
 HAYAL MEDYA · 0312 264 0 888 · Haydar Altınsaban · 0554 990 49 59
 
+SÜRÜM 1.4.3
+- Ana menü düğmesi her ekranda (üst çubuk, Alt+Home); Polaroid ve Serbest Baskı'da çarpı yerine "Ana menüye dön"
+- Polaroid / Serbest Baskı: fotoğrafa çift tıklayınca tam sayfa düzenleme (fareyle kaydır, tekerlekle yakınlaştır, renk ayarları, ayarları sıfırla, önceki/sonraki)
+- Leke fırçası: noktalar önce eklenir, "Uygula" ile hepsi birlikte işlenir (son noktayı sil, temizle)
+- Geri al fırçası: opaklığa göre, yapılan her işlemi (klon ve manuel yamalar dahil) en son aşamada siler
+- Rötuş araçları sol sütunda: simge, kısa isim ve ipucu; Manuel rötuş düğmesi büyütüldü
+- Kayıt klasörü seçilmemişse uyarı yerine doğrudan klasör seçme penceresi (Baskı ve Kayıt, Polaroid, Serbest Baskı)
+- Ölçekleme: fotoğrafı sürüklerken farenin bırakılmaması hatası giderildi
+- Ayarlar → Modeller: her modelin ne işe yaradığı, hızı ve açma/kapama önerisi
+- LaMa modeli doğrudan işlemcide çalışır (ekran kartı hatası kalktı); açılışta modeller arka planda ısıtılır
+
 SÜRÜM 1.4.2
 - Manuel rötuş: Photoshop tarzı Yama (serbest çizimle seçim, yürüyen çizgi, Kaynak/Hedef, Yayılım, canlı önizleme)
 - Fırça boyutu ve sertlik fotoğraf üzerinde sağ tıkla açılan pencerede (önizlemeli); üst çubukta Opaklık ve Akış

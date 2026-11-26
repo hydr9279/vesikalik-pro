@@ -44,29 +44,29 @@ IMN = ((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
 MODELS = {
     "birefnet": {"file": "birefnet_portrait.onnx", "size": 1024, "mean": IMN[0], "std": IMN[1], "sigmoid": True,
                  "ad": "BiRefNet Portre", "grup": "matte", "lisans": "MIT", "ticari": True,
-                 "not": "Portre için eğitilmiş; saç ve omuz kenarında çok iyi (varsayılan)."},
+                 "detay": 'Fotoğraftaki kişiyi arka plandan ayırır. Portre fotoğraflarıyla eğitilmiş, iki aşamalı bir ağdır: önce kişinin genel şeklini bulur, sonra saç ve omuz kenarını inceltir.', "iyi": 'Saç telleri, omuz ve giysi kenarı. Tüm çekimler için en güvenilir seçim.', "hiz": 'Orta (ekran kartıyla 1-2 sn, işlemciyle ~20-40 sn)', "oner": 'Açık kalsın. Programın varsayılanı ve Otomatik modun ilk tercihi.', "not": "Portre için eğitilmiş; saç ve omuz kenarında çok iyi (varsayılan)."},
     "birefnet_matting": {"file": "birefnet_matting.onnx", "size": 1024, "mean": IMN[0], "std": IMN[1], "sigmoid": True,
                          "ad": "BiRefNet Matting", "grup": "matte", "lisans": "MIT", "ticari": True, "ek": True,
-                         "not": "Yumuşak (alfa) kenarlı matting; ince saç telleri."},
+                         "detay": 'Kenarları sert kesmek yerine yumuşak geçişli (alfa) çıkarır. Saç telleri ve yarı saydam kenarlar fon rengine karışarak doğal görünür.', "iyi": 'Kıvırcık, dağınık veya ince saçlar; renkli fonlarda halesiz kenar.', "hiz": 'Orta (Portre ile benzer)', "oner": "Saçlı vesikalıklarda açık olması iyi olur. Sert kenar görürseniz Model Laboratuvarı'nda deneyin.", "not": "Yumuşak (alfa) kenarlı matting; ince saç telleri."},
     "birefnet_hr": {"file": "birefnet_hr_matting.onnx", "size": 2048, "mean": IMN[0], "std": IMN[1], "sigmoid": True,
                     "ad": "BiRefNet HR Matting (2048)", "grup": "matte", "lisans": "MIT", "ticari": True, "ek": True, "agir": True,
-                    "not": "Yüksek çözünürlük; en ince detay. Ağır: ekran kartı önerilir, yavaştır."},
+                    "detay": 'Aynı ağın 2048 piksel çözünürlüklü sürümü. Fotoğrafı daha büyük işleyerek en ince saç detayını yakalar.', "iyi": 'Çok ince, uçuşan saçlar; yüksek çözünürlüklü çekimler.', "hiz": 'Yavaş ve ağır (ekran kartı önerilir, işlemcide dakikalar sürebilir)', "oner": 'Yalnızca ince saç için gerekirse açın. Yavaş bilgisayarda kapalı kalsın; Otomatik modun hızını düşürmez.', "not": "Yüksek çözünürlük; en ince detay. Ağır: ekran kartı önerilir, yavaştır."},
     "birefnet_general": {"file": "birefnet_general.onnx", "size": 1024, "mean": IMN[0], "std": IMN[1], "sigmoid": True,
                          "ad": "BiRefNet Genel", "grup": "matte", "lisans": "MIT", "ticari": True, "ek": True,
-                         "not": "Genel amaçlı; şapka, aksesuar ve karışık sahneler."},
+                         "detay": 'Yalnızca insan değil, her türlü nesneyi ayırmak için eğitilmiş genel model.', "iyi": 'Şapka, gözlük, eşarp, mikrofon gibi aksesuarlı ya da karışık fonlu fotoğraflar.', "hiz": 'Orta', "oner": 'Portre modeli aksesuarı bozarsa deneyin. Normal çekimlerde kapalı olabilir.', "not": "Genel amaçlı; şapka, aksesuar ve karışık sahneler."},
     "ben2": {"file": "ben2_base.onnx", "size": 1024, "mean": (0.0, 0.0, 0.0), "std": (1.0, 1.0, 1.0), "sigmoid": None,
              "ad": "BEN2 Base", "grup": "matte", "lisans": "MIT", "ticari": True, "ek": True,
-             "not": "Saç ve yarı saydam kenarlarda güçlü; ayrı bir bakış açısı."},
+             "detay": 'BEN2, kenar bölgesini ayrı bir adımla düzelten farklı bir yaklaşım kullanır. Aynı fotoğrafta diğer modellerden farklı bir sonuç verir.', "iyi": "Saç ve yarı saydam kenarlar; BiRefNet'in hata yaptığı yerlerde ikinci görüş.", "hiz": 'Hızlı-orta, hafif', "oner": "Model Laboratuvarı'nda karşılaştırma için açık kalsın. Günlük kullanımda zorunlu değil.", "not": "Saç ve yarı saydam kenarlarda güçlü; ayrı bir bakış açısı."},
     "rmbg2": {"file": "rmbg2.onnx", "size": 1024, "mean": IMN[0], "std": IMN[1], "sigmoid": None,
               "ad": "RMBG-2.0", "grup": "matte", "lisans": "CC BY-NC 4.0", "ticari": False, "ek": True,
-              "not": "Ticari olmayan lisans. Sorumluluk kullanıcıya aittir."},
+              "detay": 'Ticari olmayan lisanslı bir arka plan kaldırma modeli. Kullanım sorumluluğu size aittir.', "iyi": 'Genel amaçlı iyi kenar kalitesi.', "hiz": 'Orta', "oner": 'Ticari kullanımda KAPALI tutun. Yalnızca lisansı size uygunsa açın.', "not": "Ticari olmayan lisans. Sorumluluk kullanıcıya aittir."},
     "vitmatte": {"file": "vitmatte.onnx", "size": 0, "mean": (0.485, 0.456, 0.406), "std": (0.229, 0.224, 0.225), "sigmoid": None,
                  "ad": "ViTMatte (trimap rafine)", "grup": "rafine", "lisans": "Ağırlıklar ticari değil", "ticari": False, "ek": True,
-                 "not": "Mevcut maskenin belirsiz kenarını rafine eder. Ticari olmayan lisans."},
+                 "detay": 'Mevcut maskenin belirsiz kenar bandına bakarak ince ayar yapar (üç bölgeli maske, trimap). Yeni maske üretmez, var olanı inceltir.', "iyi": 'Saç kenarındaki gri hale ve yarı saydam pikseller.', "hiz": 'Yavaş', "oner": 'Ağırlıkları ticari değil: ticari kullanımda KAPALI tutun.', "not": "Mevcut maskenin belirsiz kenarını rafine eder. Ticari olmayan lisans."},
     "isnet": {"file": "isnet-general-use.onnx", "size": 1024, "mean": (0.5, 0.5, 0.5), "std": (1.0, 1.0, 1.0), "sigmoid": False,
-              "ad": "ISNet", "grup": "matte", "lisans": "Apache 2.0", "ticari": True, "not": "Detaylı, hafif; yedek."},
+              "ad": "ISNet", "grup": "matte", "lisans": "Apache 2.0", "ticari": True, "detay": 'Hafif ve hızlı genel amaçlı ayırma modeli. Ek paket gerekmez, yedek olarak programla birlikte gelir.', "iyi": 'Düz fonlu, basit portreler; zayıf bilgisayarlarda hızlı sonuç.', "hiz": 'Hızlı', "oner": 'Açık kalsın: ekran kartı yoksa veya bellek azsa program otomatik buna geçer.', "not": "Detaylı, hafif; yedek."},
     "u2net": {"file": "u2net_human_seg.onnx", "size": 320, "mean": IMN[0], "std": IMN[1], "sigmoid": False,
-              "ad": "U²-Net İnsan", "grup": "matte", "lisans": "Apache 2.0", "ticari": True, "not": "Hızlı; en düşük kalite."},
+              "ad": "U²-Net İnsan", "grup": "matte", "lisans": "Apache 2.0", "ticari": True, "detay": 'Küçük ve en hızlı model; yalnızca insan ayırmak için eğitilmiş. Düşük çözünürlükte (320 piksel) çalışır.', "iyi": 'Çok hızlı önizleme; kenar kalitesinin önemli olmadığı durumlar.', "hiz": 'Çok hızlı', "oner": 'Son çare yedeği. Kenarları kaba olduğundan normal işte kapalı tutabilirsiniz.', "not": "Hızlı; en düşük kalite."},
     "parse": {"file": "face_parsing_resnet34.onnx"},
     "lama": {"file": "lama.onnx"},
     "sam": {"file": "efficientsam.onnx"},
@@ -109,6 +109,28 @@ def _providers(force_cpu=False):
     return order
 
 
+_CPU_ONLY = {"lama"}
+_ISITILDI = False
+
+
+def isit():
+    """Açılışta, kullanıcı fotoğraf seçerken modelleri arka planda yükler (ilk analiz hızlı olsun)."""
+    global _ISITILDI
+    if _ISITILDI:
+        return
+    _ISITILDI = True
+    import threading
+
+    def go():
+        try:
+            for k in ("parse", best_matte_model("auto"), "lama"):
+                if k in MODELS and has_model(k) and k not in _KAPALI:
+                    session(k)
+        except Exception as e:
+            log(f"Model ısıtma atlandı: {e}", "WARN")
+    threading.Thread(target=go, daemon=True).start()
+
+
 def session(key: str):
     """Modeli bir kez yükler. GPU başarısız olursa CPU'ya düşer."""
     with _LOCK:
@@ -125,7 +147,8 @@ def session(key: str):
             so.enable_mem_pattern = False
             so.enable_cpu_mem_arena = False
         last_err = None
-        for force_cpu in ((True,) if _FORCE_CPU else (False, True)):
+        # LaMa nicemlenmiş (quantized) bir modeldir: CUDA bu işlemleri desteklemez, doğrudan işlemcide çalıştırılır
+        for force_cpu in ((True,) if (_FORCE_CPU or key in _CPU_ONLY) else (False, True)):
             try:
                 s = ort.InferenceSession(path, so, providers=_providers(force_cpu))
                 used = s.get_providers()[0]

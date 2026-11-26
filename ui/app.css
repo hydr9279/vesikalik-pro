@@ -280,3 +280,27 @@ kbd{display:inline-block;min-width:24px;padding:2px 7px;border-radius:6px;border
 .mv-pop .sayi{width:54px;height:26px;border-radius:6px;border:1px solid var(--cizgi);background:var(--yukselti);color:var(--yazi);text-align:right;padding:0 4px}
 .mv-pop i{font-style:normal;width:14px}
 .mv-harita{display:block;border-radius:6px;border:1px solid var(--cizgi);cursor:pointer;background:#222}
+.ana-menu{gap:6px;height:34px;padding:0 12px;margin-right:4px;font-weight:700}
+
+/* ---- Polaroid / Serbest gelişmiş düzenleme sayfası ---- */
+.duzen{position:fixed;inset:0;z-index:700;background:var(--zemin);display:flex;flex-direction:column}
+.duzen-ust{height:56px;flex:none;display:flex;align-items:center;gap:12px;padding:0 14px;background:var(--panel);border-bottom:1px solid var(--cizgi)}
+.duzen-govde{flex:1;display:flex;min-height:0}
+.duzen-alan{flex:1;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#23262c;touch-action:none;cursor:grab;user-select:none}
+.duzen-cerceve{position:relative;overflow:hidden;background:#fff;box-shadow:0 8px 40px rgba(0,0,0,.55)}
+.dz-bg{position:absolute;inset:-30px;background-size:cover;background-position:center}
+.dz-fg{position:absolute;max-width:none;pointer-events:none}
+.duzen-sag{width:330px;flex:none;background:var(--panel);border-left:1px solid var(--cizgi);overflow-y:auto;padding:6px 14px 14px}
+.duzen-alt{height:30px;flex:none;display:flex;justify-content:space-between;align-items:center;padding:0 12px;background:var(--panel);border-top:1px solid var(--cizgi);color:var(--soluk);font-size:12px}
+
+/* ---- Rötuş: sol dikey araç sütunu ---- */
+.dikey-arac{position:absolute;left:12px;top:12px;bottom:58px;width:84px;display:flex;flex-direction:column;gap:3px;padding:6px;border-radius:12px;background:var(--panel);border:1px solid var(--cizgi);box-shadow:0 8px 24px rgba(0,0,0,.3);z-index:6;overflow-y:auto;scrollbar-width:thin}
+.dikey-arac i{display:block;height:1px;background:var(--cizgi);margin:3px 6px;flex:none}
+.arac-d{display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 2px;border-radius:9px;border:1px solid transparent;background:transparent;color:var(--soluk);cursor:pointer;flex:none}
+.arac-d span{font-size:19px;line-height:1}
+.arac-d small{font-size:10.5px;text-align:center;line-height:1.15}
+.arac-d:hover{background:var(--yukselti);color:var(--yazi)}
+.arac-d.secili{background:var(--vurgu);color:var(--vurgu-yazi)}
+.leke-bekleyen{position:absolute;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;border:2px dashed #F5B63F;background:rgba(245,182,63,.18);pointer-events:none}
+.manuel-buyuk{height:56px;justify-content:flex-start;gap:12px;padding:0 16px;margin:2px 0 10px}
+.model-detay{font-size:12px;color:var(--soluk);line-height:1.45;max-width:420px}.model-detay p{margin:0 0 3px}.model-detay .oner{color:var(--yazi)}.model-detay b{color:var(--yazi);font-weight:600}
