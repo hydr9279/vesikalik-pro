@@ -8,3 +8,8 @@
 
 ## Arayüz toplu iş (onay bekliyor)
 Açılır/kapanır paneller, Kamera klasörünü kaldırma, üst bar sadeleştirme, fare oku aracı (basılı tut = orijinal), ileri/geri okları + bilgi satırı, tuş geri bildirimi, ön ayar kaydet, otomatik beyaz dengesi çubukları, leke noktaları (kırmızı/yeşil, sağ tık ayarları).
+
+
+## 1.4.6 ile yapılanlar
+- Arayüz toplu işi (ekran01–11) tamamlandı. Öğrenme günlüğü (ogrenme.jsonl, yalnız sayılar) eklendi; öneri arayüzü sonraki sürüm.
+- Not: yeşil leke işaretine sağ tık anında siler ve bölgeyi eski haline döndürür (ayrı "tekrar Uygula" gerekmez).

@@ -2,6 +2,18 @@
 HAYDAR ALTINSABAN yapımıdır · Tüm hakları saklıdır
 HAYAL MEDYA · 0312 264 0 888 · Haydar Altınsaban · 0554 990 49 59
 
+SÜRÜM 1.4.6
+- Sağ paneldeki tüm bölüm başlıkları Camera Raw gibi açılıp kapanır; durum hatırlanır.
+- "Kamera klasörü" özelliği kaldırıldı.
+- Araç çubuğu sadeleşti: simge + kısa ad, üzerine gelince açıklama.
+- Yeni "Seç" aracı (V): fotoğrafa basılı tutunca orijinal, bırakınca işlemli hâl.
+- Fotoğraf altında Geri / İleri okları ve hangi işlemin geri/ileri alınacağını yazan bilgi satırı (Arka plan ve Rötuş).
+- Leke noktaları: işlenmemişler kırmızı, "Uygula"dan sonra yeşil; sağ tık ile boyut ve kenar yumuşaklığı; yeşile sağ tık silip bölgeyi eski hâline döndürür.
+- Keskinleştirme değerleri 0 başlar; otomatik beyaz dengesi kapalı başlar, açılınca kanal değişimi çubuklarda görünür ve çubuklar canlıdır.
+- "STİL" bölümü "ÖN AYAR KAYDET" oldu (isim vererek kaydet).
+- Basılan düğmeler renk değiştirir.
+- Rötuş alışkanlıkları yalnızca sayı olarak bu bilgisayarda kaydedilir (Ayarlar'dan kapatılır/silinir) — ileride kişisel öneriler için.
+
 SÜRÜM 1.4.5
 - Çubuklar sürüklenirken canlı etki eder; fırça şekillendirme canlı görünür.
 - Klon damgası: Alt basılıyken örnek bölge imlecin içinde gösterilir.

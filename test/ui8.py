@@ -1,0 +1,37 @@
+import asyncio
+from playwright.async_api import async_playwright
+OUT='test/shots'
+async def main():
+    async with async_playwright() as p:
+        b=await p.chromium.launch(executable_path='/usr/bin/google-chrome',args=['--no-sandbox'])
+        pg=await b.new_page(viewport={'width':1440,'height':900})
+        errs=[]; pg.on('pageerror',lambda e: errs.append(str(e)))
+        await pg.goto('http://127.0.0.1:8765/index.html'); await pg.wait_for_timeout(1500)
+        await pg.evaluate("yollaEkle(['/home/claude/ornekler/orijinal/IMG_7923.JPG'])")
+        await pg.wait_for_function("S.st && S.st.uygunluk", timeout=120000)
+        await pg.evaluate("S.ayar.model='isnet'; adimaGit(2)")
+        await pg.wait_for_function("S.adim===2 && !mesgul", timeout=500000); await pg.wait_for_timeout(1500)
+        # rötuş seç aracı
+        await pg.keyboard.press('v'); await pg.wait_for_timeout(500)
+        box=await pg.locator('.tuval-alan').bounding_box()
+        s1=await pg.evaluate("document.querySelector('.tuval-ic img').src.length")
+        await pg.mouse.move(box['x']+400,box['y']+300); await pg.mouse.down(); await pg.wait_for_timeout(1500)
+        s2=await pg.evaluate("document.querySelector('.tuval-ic img').src.length"); await pg.mouse.up(); await pg.wait_for_timeout(300)
+        s3=await pg.evaluate("document.querySelector('.tuval-ic img').src.length"); print('rotus orijinal tut', await pg.evaluate("S.rArac"), s1,s2,s3)
+        await pg.evaluate("adimaGit(1)"); await pg.wait_for_function("S.adim===1 && !mesgul", timeout=500000); await pg.wait_for_timeout(1500)
+        await pg.screenshot(path=f'{OUT}/v1.png')
+        await pg.evaluate("S.arac='firca+'; sahneCiz()")
+        await pg.mouse.move(box['x']+300,box['y']+300); await pg.mouse.down(); await pg.mouse.move(box['x']+340,box['y']+330,steps=4); await pg.mouse.up()
+        await pg.wait_for_function("!mesgul && S.st.gecmis.arkaplan.sayi>=1", timeout=120000); await pg.wait_for_timeout(1200)
+        print('bilgi', await pg.inner_text('.gecmis-bilgi'))
+        await pg.click('#gOkGeri'); await pg.wait_for_function("!mesgul && S.st.gecmis.arkaplan.sayi==0", timeout=120000); await pg.wait_for_timeout(800)
+        print('geri sonrası', await pg.inner_text('.gecmis-bilgi'))
+        await pg.click('#gOkIleri'); await pg.wait_for_function("S.st.gecmis.arkaplan.sayi==1", timeout=120000); await pg.wait_for_timeout(800)
+        await pg.keyboard.press('v'); await pg.wait_for_timeout(400)
+        a1=await pg.evaluate("document.querySelector('.tuval-ic img').src.length")
+        await pg.mouse.move(box['x']+400,box['y']+300); await pg.mouse.down(); await pg.wait_for_timeout(1500)
+        a2=await pg.evaluate("document.querySelector('.tuval-ic img').src.length"); await pg.mouse.up(); await pg.wait_for_timeout(300)
+        a3=await pg.evaluate("document.querySelector('.tuval-ic img').src.length"); print('arkaplan orijinal tut', await pg.evaluate("S.arac"), a1,a2,a3, errs)
+        await pg.screenshot(path=f'{OUT}/v2.png')
+        await b.close()
+asyncio.run(main())

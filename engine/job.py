@@ -22,7 +22,7 @@ WORK_FACE_H = 950  # çalışma görüntüsünde yüz kutusu yüksekliği (px)
 
 DEFAULT_MATTE = {"model": "auto", "fon_ayikla": 60, "sac_detay": 70, "yumusaklik": 30, "daraltma": 1, "tasma": 80, "sac_temizle": 0, "sac_renk": 0, "sac_modu": "otomatik", "vitmatte": False}
 DEFAULT_RETOUCH = {"leke": 55, "yumusatma": 25, "doku": 70, "parlama": 40, "gozalti": 15, "goz_beyaz": 0,
-                   "dis_beyaz": 0, "gozluk": 0, "pozlama": 0, "kontrast": 0, "sicaklik": 0, "oto_beyaz": True,
+                   "dis_beyaz": 0, "gozluk": 0, "pozlama": 0, "kontrast": 0, "sicaklik": 0, "oto_beyaz": False, "oto_ofs": [0, 0, 0],
                    "stil": "", "stil_guc": 100, "spots": [], "geri_al": [],
                    "koruma": 85, "guvenli": True, "fircalar": [], "koruma_fircalar": [],
                    "pro": dict(DEFAULT_PRO), "klon": [], "keskin": dict(DEFAULT_KESKIN)}
@@ -69,6 +69,8 @@ class Job:
         self._pre_key = None; self._pre_out = None; self._pre_skin = None   # ışık/renk ve keskinlik öncesi ara sonuç (çubuklar canlı çalışsın diye)
         self._fg_cache = None
         self.edits = []
+        self.gecmis = {"rotus": [], "arkaplan": []}      # genel geri/ileri: (ad, anlık görüntü)
+        self.ileri_yigin = {"rotus": [], "arkaplan": []}
         self.matte_params = dict(DEFAULT_MATTE)
         self.retouch_params = json.loads(json.dumps(DEFAULT_RETOUCH))
         self.geom = dict(DEFAULT_GEOM)
@@ -531,8 +533,12 @@ class Job:
             for i in range(1, n2):
                 self.spots_found.append([float(cen2[i][0] / Ww), float(cen2[i][1] / Hh)])
         Hh, Ww = L.shape
-        for sx, sy, sr in p.get("spots", []):
+        soft_spots = []          # kenarı yumuşatılmış noktalar: (x, y, r, yumuşaklık 0..1)
+        for sp_ in p.get("spots", []):
+            sx, sy, sr = sp_[0], sp_[1], sp_[2]
+            sf = float(sp_[3]) if len(sp_) > 3 else 0.0
             cv2.circle(spots, (int(sx * Ww), int(sy * Hh)), max(2, int(sr * Ww)), 1, -1)
+            if sf > 0.02: soft_spots.append((sx, sy, sr, sf))
         # 2) Gözlük yansıması
         if p["gozluk"] > 0 and (L == F.GLASSES).sum() > iod * 2:
             hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
@@ -547,6 +553,7 @@ class Job:
             gm = ((glare | tint) & region).astype(np.uint8)
             gm = cv2.dilate(gm, np.ones((5, 5), np.uint8), iterations=2)
             spots = np.maximum(spots, gm)
+        img_pre = img
         if spots.any():
             skey = hashlib.md5(spots.tobytes()).hexdigest()
             if getattr(self, "_inpaint_key", None) == skey:
@@ -556,6 +563,22 @@ class Job:
                 sp = cv2.dilate(spots, np.ones((3, 3), np.uint8), iterations=max(1, int(iod * 0.012)))
                 img = self._inpaint(img, sp, (bx0, by0, bx1, by1))
                 self._inpaint_key, self._inpainted = skey, img
+            if soft_spots:   # yumuşak kenar: onarılan bölgeyi özgün görüntüyle kademeli karıştır
+                alpha = np.zeros(spots.shape, np.float32)
+                for sx, sy, sr, sf in soft_spots:
+                    rp = max(2, int(sr * Ww)); sg = max(1.0, rp * sf * 0.8)
+                    x0 = max(0, int(sx * Ww) - int(rp * (1 + 3 * sf)) - 6); x1 = min(Ww, int(sx * Ww) + int(rp * (1 + 3 * sf)) + 7)
+                    y0 = max(0, int(sy * Hh) - int(rp * (1 + 3 * sf)) - 6); y1 = min(Hh, int(sy * Hh) + int(rp * (1 + 3 * sf)) + 7)
+                    t = np.zeros((y1 - y0, x1 - x0), np.float32)
+                    cv2.circle(t, (int(sx * Ww) - x0, int(sy * Hh) - y0), max(1, int(rp * (1 - 0.5 * sf))), 1.0, -1)
+                    t = np.clip(cv2.GaussianBlur(t, (0, 0), sg) * 1.6, 0, 1)
+                    alpha[y0:y1, x0:x1] = np.maximum(alpha[y0:y1, x0:x1], t)
+                hard = spots.copy()
+                for sx, sy, sr, sf in soft_spots:
+                    cv2.circle(hard, (int(sx * Ww), int(sy * Hh)), max(2, int(sr * Ww)), 0, -1)
+                hard = cv2.dilate(hard, np.ones((3, 3), np.uint8), iterations=max(1, int(iod * 0.012))).astype(np.float32)
+                a2 = np.maximum(alpha, hard)[..., None]
+                img = (img_pre.astype(np.float32) * (1 - a2) + img.astype(np.float32) * a2).astype(np.uint8)
 
         f = img.astype(np.float32)
         skin_soft = cv2.GaussianBlur(skin.astype(np.float32), (0, 0), max(1.5, iod * 0.02)) * (1 - prot)
@@ -623,7 +646,7 @@ class Job:
         self._pre_key, self._pre_out, self._pre_skin = pre_key, out, skin_soft
         self._retouch_post(out, skin_soft, p, key)
 
-    _POST_KEYS = ("sicaklik", "pozlama", "kontrast", "stil", "stil_guc", "oto_beyaz", "keskin", "fircalar")
+    _POST_KEYS = ("sicaklik", "pozlama", "kontrast", "stil", "stil_guc", "oto_beyaz", "oto_ofs", "keskin", "fircalar")
 
     def _retouch_post(self, out, skin_soft, p, key):
         iod = self.iod
@@ -672,13 +695,18 @@ class Job:
 
     def _tone(self, img, p):
         f = img.astype(np.float32)
+        self.oto_durum = None
         if p.get("oto_beyaz") and self.A is not None:
             bgm = (self.A < 0.05)
             if bgm.sum() > 1000:
                 mean = f[bgm].mean(0)
                 gray = mean.mean()
-                gains = np.clip(gray / np.maximum(mean, 1), 0.85, 1.15)
-                f *= gains
+                gains = np.clip(gray / np.maximum(mean, 1), 0.85, 1.15)       # B, G, R sırası
+                auto = (gains[::-1] - 1) * 100                                  # R, G, B yüzde değişim
+                ofs = np.array((p.get("oto_ofs") or [0, 0, 0]), np.float32)
+                etkin = np.clip(auto + ofs, -30, 30)
+                f *= (1 + etkin[::-1] / 100).astype(np.float32)
+                self.oto_durum = {"auto": [round(float(x), 2) for x in auto], "etkin": [round(float(x), 2) for x in etkin]}
         if p["sicaklik"]:
             t = p["sicaklik"] / 100.0
             f[..., 2] *= 1 + 0.08 * t

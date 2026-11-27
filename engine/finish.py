@@ -6,7 +6,7 @@ import numpy as np
 
 DEFAULT_PRO = {"acik": False, "miktar": 60, "ince": 4, "orta": 5, "kaba": 3, "esik": 55, "tolerans": 24, "yayilma": 100,
                "ornekler": []}
-DEFAULT_KESKIN = {"miktar": 50, "yaricap": 1.0, "esik": 0, "cilt_koru": True}
+DEFAULT_KESKIN = {"miktar": 0, "yaricap": 1.0, "esik": 0, "cilt_koru": True}
 
 
 def skin_sample_mask(img_bgr, samples, iod, tol=24, feather=1.0):

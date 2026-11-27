@@ -89,6 +89,66 @@ class Api:
         H, W = j.W.shape[:2]
         return float(p[0] / W), float(p[1] / H), s
 
+    # ---------------------------------------------------------- genel geri / ileri geçmişi
+    _GECMIS_ANAHTAR = ("spots", "geri_al", "klon", "fircalar", "koruma_fircalar")
+
+    def _anlik(self, j, kapsam):
+        import copy
+        if kapsam == "arkaplan":
+            return {"edits": copy.deepcopy(j.edits)}
+        d = {k: copy.deepcopy(j.retouch_params.get(k, [])) for k in self._GECMIS_ANAHTAR}
+        d["shape_ops"] = copy.deepcopy(j.shape_ops)
+        return d
+
+    def _gecmis_yaz(self, j, kapsam, ad):
+        """Bir işlemden ÖNCE çağrılır: o ana dönebilmek için anlık görüntü saklar, ileri yığınını temizler."""
+        g = j.gecmis.setdefault(kapsam, [])
+        g.append((ad, self._anlik(j, kapsam)))
+        del g[:-60]
+        j.ileri_yigin[kapsam] = []
+
+    def _anlik_uygula(self, j, kapsam, d):
+        if kapsam == "arkaplan":
+            j.edits = list(d["edits"])
+            j.rebuild_alpha()
+        else:
+            for k in self._GECMIS_ANAHTAR:
+                j.retouch_params[k] = list(d[k])
+            j.shape_ops = list(d["shape_ops"])
+            j._retouch_key = None; j._pre_key = None
+            j.retouch(self._p)
+
+    def genel_geri_al(self, jid, fid, kapsam="rotus"):
+        def go():
+            j = self._jobs[jid]
+            g = j.gecmis.get(kapsam) or []
+            if g:
+                ad, once = g.pop()
+                j.ileri_yigin.setdefault(kapsam, []).append((ad, self._anlik(j, kapsam)))
+                self._p(0.4, f"Geri alınıyor: {ad}")
+                self._anlik_uygula(j, kapsam, once)
+            return self._state(j, fid)
+        return self._safe(go)
+
+    def genel_ileri_al(self, jid, fid, kapsam="rotus"):
+        def go():
+            j = self._jobs[jid]
+            y = j.ileri_yigin.get(kapsam) or []
+            if y:
+                ad, sonra = y.pop()
+                j.gecmis.setdefault(kapsam, []).append((ad, self._anlik(j, kapsam)))
+                self._p(0.4, f"İleri alınıyor: {ad}")
+                self._anlik_uygula(j, kapsam, sonra)
+            return self._state(j, fid)
+        return self._safe(go)
+
+    def _gecmis_ozet(self, j):
+        o = {}
+        for k in ("rotus", "arkaplan"):
+            g, y = j.gecmis.get(k) or [], j.ileri_yigin.get(k) or []
+            o[k] = {"geri": g[-1][0] if g else None, "ileri": y[-1][0] if y else None, "sayi": len(g)}
+        return o
+
     def _state(self, j: Job, fid: str, mode="sonuc"):
         fmt = self._fmt(fid)
         out = {"id": j.id, "gorsel": self._view(j, fid, mode)}
@@ -99,6 +159,8 @@ class Api:
         out["model"] = getattr(j, "matte_model", "")
         out["matte"] = {k: v for k, v in j.matte_params.items()}
         out["rotus"] = {k: v for k, v in j.retouch_params.items() if k not in ("spots", "geri_al", "fircalar", "koruma_fircalar", "klon", "manuel")}
+        out["oto"] = getattr(j, "oto_durum", None)
+        out["gecmis"] = self._gecmis_ozet(j)
         out["manuel_var"] = [j.manuel_m is not None, j.manuel_Am is not None]
         out["klon_sayisi"] = len(j.retouch_params.get("klon") or [])
         out["sekil_sayisi"] = len(j.shape_ops)
@@ -133,7 +195,7 @@ class Api:
             for sx, sy in j.spots_found:
                 p = M[:, :2] @ np.array([sx * W, sy * H]) + M[:, 2]
                 spots.append([p[0] / Wc, p[1] / Hc, 0])
-            for sx, sy, sr in j.retouch_params.get("spots", []):
+            for sx, sy, sr, *_ in j.retouch_params.get("spots", []):
                 p = M[:, :2] @ np.array([sx * W, sy * H]) + M[:, 2]
                 spots.append([p[0] / Wc, p[1] / Hc, 1])
             out["lekeler"] = spots
@@ -495,6 +557,7 @@ class Api:
         """e: {t:'sam', x,y, pos} veya {t:'brush', pts:[[x,y]...], r, add, hard} (önizleme koordinatı 0..1)."""
         def go():
             j = self._jobs[jid]
+            self._gecmis_yaz(j, "arkaplan", ("Kişiye ekle" if e.get("pos") else "Fondan say") if e["t"] == "sam" else ("Fırça ile ekleme" if e.get("add") else "Fırça ile silme"))
             self._p(0.3, "Seçim yeniden hesaplanıyor (SAM)" if e["t"] == "sam" else "Fırça uygulanıyor")
             if e["t"] == "sam":
                 x, y, s = self._to_work(j, fid, e["x"], e["y"])
@@ -512,11 +575,7 @@ class Api:
         return self._safe(go)
 
     def undo_edit(self, jid, fid):
-        def go():
-            j = self._jobs[jid]
-            j.undo_edit()
-            return self._state(j, fid)
-        return self._safe(go)
+        return self.genel_geri_al(jid, fid, "arkaplan")
 
     def view(self, jid, fid, mode):
         def go():
@@ -587,6 +646,7 @@ class Api:
             M, (Wc, Hc), ppm, s = j.transform(self._fmt(fid), EDIT_MULT)
             r = e["r"] * Wc / s / j.W.shape[1]
             key = "koruma_fircalar" if e.get("tur") == "koru" else "fircalar"
+            self._gecmis_yaz(j, "rotus", "Koruma fırçası" if key == "koruma_fircalar" else "Geri al fırçası")
             j.retouch_params.setdefault(key, []).append({"pts": pts, "r": r, "val": float(e.get("val", 1.0)), "hard": float(e.get("hard", 0.4))})
             self._p(0.4, "Fırça uygulanıyor")
             j.retouch(self._p)
@@ -604,6 +664,7 @@ class Api:
             sx, sy, _ = self._to_work(j, fid, e["src"][0], e["src"][1])
             M, (Wc, Hc), ppm, s = j.transform(self._fmt(fid), EDIT_MULT)
             r = e["r"] * Wc / s / j.W.shape[1]
+            self._gecmis_yaz(j, "rotus", "Klon damgası")
             j.retouch_params.setdefault("klon", []).append({"pts": pts, "src": [sx, sy], "r": r,
                                                            "val": float(e.get("val", 1.0)), "hard": float(e.get("hard", 0.4))})
             self._p(0.4, "Klon damgası uygulanıyor")
@@ -621,6 +682,7 @@ class Api:
                 pts.append((x, y))
             M, (Wc, Hc), ppm, s = j.transform(self._fmt(fid), EDIT_MULT)
             r = e["r"] * Wc / s / j.W.shape[1]
+            self._gecmis_yaz(j, "rotus", {"it": "İt / çek", "sis": "Şişir", "kuc": "Küçült"}.get(e["tur"], "Şekillendirme"))
             j.shape_ops.append({"t": e["tur"], "pts": pts, "r": r, "guc": float(e.get("guc", 0.6))})
             return self._state(j, fid)
         return self._safe(go)
@@ -654,8 +716,10 @@ class Api:
         def go():
             j = self._jobs[jid]
             if hepsi:
+                if j.shape_ops: self._gecmis_yaz(j, "rotus", "Şekillendirmeyi sıfırla")
                 j.shape_ops.clear(); j.omuz = 0.0
             elif j.shape_ops:
+                self._gecmis_yaz(j, "rotus", "Şekillendirme geri alma")
                 j.shape_ops.pop()
             return self._state(j, fid)
         return self._safe(go)
@@ -708,6 +772,7 @@ class Api:
         def go():
             j = self._jobs[jid]
             n = len(j.spots_found)
+            self._gecmis_yaz(j, "rotus", "Leke işareti silme")
             if 0 <= idx < n:
                 j.retouch_params.setdefault("geri_al", []).append(list(j.spots_found[idx]))
             elif 0 <= idx - n < len(j.retouch_params.get("spots", [])):
@@ -722,6 +787,7 @@ class Api:
         def go():
             j = self._jobs[jid]
             wx, wy, s = self._to_work(j, fid, x, y)
+            self._gecmis_yaz(j, "rotus", "Leke işlemi")
             near = [p for p in j.spots_found if abs(p[0] - wx) < 0.01 and abs(p[1] - wy) < 0.01]
             if near:
                 j.retouch_params.setdefault("geri_al", []).append([wx, wy])
@@ -738,13 +804,17 @@ class Api:
         def go():
             j = self._jobs[jid]
             M, (Wc, Hc), ppm, s2 = j.transform(self._fmt(fid), EDIT_MULT)
-            for x, y in pts:
+            self._gecmis_yaz(j, "rotus", f"Leke işlemi ({len(pts)} nokta)")
+            for pt in pts:
+                x, y = pt[0], pt[1]
+                rr = float(pt[2]) if len(pt) > 2 and pt[2] else r
+                sf = float(pt[3]) if len(pt) > 3 and pt[3] else 0.0
                 wx, wy, s = self._to_work(j, fid, x, y)
                 near = [p for p in j.spots_found if abs(p[0] - wx) < 0.01 and abs(p[1] - wy) < 0.01]
                 if near:
                     j.retouch_params.setdefault("geri_al", []).append([wx, wy])
                 else:
-                    j.retouch_params.setdefault("spots", []).append([wx, wy, r * Wc / s2 / j.W.shape[1]])
+                    j.retouch_params.setdefault("spots", []).append([wx, wy, rr * Wc / s2 / j.W.shape[1], sf])
             self._p(0.4, f"{len(pts)} leke onarılıyor")
             j.retouch(self._p)
             return self._state(j, fid)
@@ -836,6 +906,8 @@ class Api:
                                 "dosyalar": paths, "klasor": folder, "yazdirildi": printed, "kaynak": j.path,
                                 "geom": j.geom, "bg": j.bg, "matte": {k: v for k, v in j.matte_params.items()},
                                 "rotus": {k: v for k, v in j.retouch_params.items() if k not in ("spots", "geri_al", "fircalar", "koruma_fircalar")}})
+            storage.learn_log({**{k: v for k, v in j.retouch_params.items() if k not in ("spots", "geri_al", "fircalar", "koruma_fircalar", "klon", "stil", "pro")},
+                               "leke_sayisi": len(j.retouch_params.get("spots", [])), "omuz": getattr(j, "omuz", 0.0)})
             storage.bump_archive_no(int(no) if str(no).isdigit() else 0)
             log(f"Kaydedildi: {no} {fmt['ad']} → {folder}")
             return {"dosyalar": paths, "yazdirildi": printed, "sonraki_no": storage.next_archive_no()}
@@ -887,6 +959,12 @@ class Api:
 
     def update_settings(self, changes, pw=""):
         return self._safe(lambda: {"ayarlar": (storage.update_settings(changes, pw), storage.public_settings())[1]})
+
+    def ogrenme_durum(self):
+        return {"kayit": storage.learn_count(), "acik": storage.load_settings().get("ogrenme_kayit", True)}
+
+    def ogrenme_sil(self):
+        return self._safe(lambda: {"silinen": storage.learn_clear()})
 
     def arsiv_sifirla(self, ad, pw):
         return self._safe(lambda: {"silinen": storage.reset_archive(ad, pw)})
@@ -1148,29 +1226,6 @@ class Api:
 
     def open_logs(self):
         return self.open_folder(log_dir())
-
-    def poll_camera(self):
-        """Kamera klasöründeki yeni çekimleri sıraya ekler (ilk çağrıda mevcutlar yok sayılır)."""
-        s = storage.load_settings()
-        d = s.get("kamera_klasoru")
-        if not (s.get("kamera_izle") and d and os.path.isdir(d)):
-            return {"yeni": []}
-        exts = IMG_EXTS
-        now = {os.path.join(d, f) for f in os.listdir(d) if f.lower().endswith(exts)}
-        if getattr(self, "_cam_dir", None) != d:
-            self._cam_dir, self._cam_seen = d, now
-            return {"yeni": []}
-        new = []
-        for p in sorted(now - self._cam_seen):
-            try:
-                s1 = os.path.getsize(p); time.sleep(0.3)
-                if os.path.getsize(p) != s1:
-                    continue  # hâlâ yazılıyor
-            except OSError:
-                continue
-            new.append(p)
-            self._cam_seen.add(p)
-        return {"yeni": self.add_files(new) if new else []}
 
     def log_js_error(self, msg):
         log(f"Arayüz hatası: {msg}", "ERROR")

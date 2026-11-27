@@ -32,14 +32,13 @@ def _default_settings() -> dict:
         "varsayilan_yazici": "",
         "rotus_profilleri": {},   # ad -> rötuş ayarları
         "ozel_fonlar": [],
-        "kamera_klasoru": "",
-        "kamera_izle": False,
         "tekli_jpg": True,
         "son_kontrol": True,
         "hizli_mod": False,
         "gpu_kullan": True,
         "sablon_goster": True,
         "model": "auto",
+        "ogrenme_kayit": True,     # yerel, yalnız sayısal rötuş ayarları; fotoğraf/isim içermez
     }
 
 
@@ -225,3 +224,39 @@ def import_settings(path: str, pw: str) -> None:
             if n.startswith("stiller/") and n.endswith(".npy"):
                 with open(os.path.join(styles_dir(), os.path.basename(n)), "wb") as f:
                     f.write(z.read(n))
+
+
+# ---------------------------------------------------------------- öğrenme günlüğü (yerel, yalnız sayılar)
+LEARN_FILE = os.path.join(data_dir(), "ogrenme.jsonl")
+
+def learn_log(rec: dict) -> None:
+    """Her kayıtta rötuş ayar sayılarını yerel dosyaya ekler. Fotoğraf, müşteri adı ya da dosya yolu YAZILMAZ."""
+    try:
+        if not load_settings().get("ogrenme_kayit", True):
+            return
+        def num(v):
+            if isinstance(v, bool): return v
+            if isinstance(v, (int, float)): return v
+            if isinstance(v, dict): return {k: num(x) for k, x in v.items() if num(x) is not None}
+            if isinstance(v, (list, tuple)) and all(isinstance(x, (int, float)) for x in v): return list(v)
+            return None
+        r = {k: num(v) for k, v in rec.items()}
+        r = {k: v for k, v in r.items() if v is not None}
+        r["t"] = datetime.datetime.now().isoformat(timespec="seconds")
+        with open(LEARN_FILE, "a", encoding="utf-8") as f:
+            f.write(json.dumps(r, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+def learn_count() -> int:
+    try:
+        with open(LEARN_FILE, encoding="utf-8") as f:
+            return sum(1 for _ in f)
+    except OSError:
+        return 0
+
+def learn_clear() -> int:
+    n = learn_count()
+    try: os.remove(LEARN_FILE)
+    except OSError: pass
+    return n
