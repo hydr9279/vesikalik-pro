@@ -31,6 +31,12 @@ class Api:
         self._jobs: dict = {}
         self._prog = {"aktif": False, "yuzde": 0, "mesaj": "", "basla": 0}
         self._plock = threading.Lock()
+        try:
+            import engine.job as _J
+            _m = storage.load_settings().get("kenar_modu", "uzat")
+            _J.KENAR_MODU = _m if _m in ("uzat", "doldur", "yumusat") else "uzat"
+        except Exception:
+            pass
 
     # ---------------------------------------------------------- yardımcılar
     def _p(self, pct, msg):
@@ -149,6 +155,45 @@ class Api:
             o[k] = {"geri": g[-1][0] if g else None, "ileri": y[-1][0] if y else None, "sayi": len(g)}
         return o
 
+    def _kadraj(self, j, fmt):
+        """Fotoğraf seçili ebatın tamamını kaplıyor mu? Eksik kenar oranları ve büyütme (çözünürlük) bilgisi."""
+        M, (Wc, Hc), ppm, sc = j.transform(fmt, 1)
+        h0, w0 = j.W.shape[:2]
+        k = 0.25
+        Ms = M.copy(); Ms[:, :] *= k
+        ones = cv2.warpAffine(np.ones((h0, w0), np.float32), Ms, (max(8, int(Wc * k)), max(8, int(Hc * k))), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+        miss = ones < 0.5
+        h, w = miss.shape
+        eksik = {"alt": round(float(miss[int(h * 0.55):].mean()) , 3), "ust": round(float(miss[:int(h * 0.25)].mean()), 3),
+                 "sol": round(float(miss[:, :int(w * 0.2)].mean()), 3), "sag": round(float(miss[:, int(w * 0.8):].mean()), 3)}
+        toplam = round(float(miss.mean()), 3)
+        # sc: çıktı pikseli / kaynak pikseli (1 mm = MM piksel). >1 ise fotoğraf bu ebat için 300 DPI'dan düşük
+        return {"eksik": eksik, "toplam": toplam, "buyutme": round(float(sc), 2),
+                "sorun": bool(toplam > 0.012 or sc > 1.2), "gen_mm": fmt["gen_mm"], "yuk_mm": fmt["yuk_mm"]}
+
+    def kadraj_doldur(self, jid, fid):
+        """Ölçeklemede olabildiğince yakınlaştırarak eksik kenarları kapatmayı dener (baş ölçüsü sınırını aşmadan)."""
+        def go():
+            j = self._jobs[jid]
+            fmt = self._fmt(fid)
+            base = dict(j.geom)
+            m0 = j.measures(fmt)["bas_mm"]
+            best = None
+            z = base.get("zoom", 1.0)
+            for i in range(0, 46):
+                zz = round(base.get("zoom", 1.0) * (1 + 0.005 * i), 4)
+                j.geom["zoom"] = zz
+                bas = j.measures(fmt)["bas_mm"]
+                if bas > fmt["head_max"] - 0.3:
+                    break
+                best = zz
+                if self._kadraj(j, fmt)["toplam"] <= 0.003:
+                    break
+            j.geom["zoom"] = best if best else base.get("zoom", 1.0)
+            kd = self._kadraj(j, fmt)
+            return {**self._state(j, fid), "doldur": {"tamam": kd["toplam"] <= 0.012, "kalan": kd["toplam"]}}
+        return self._safe(go)
+
     def _state(self, j: Job, fid: str, mode="sonuc"):
         fmt = self._fmt(fid)
         out = {"id": j.id, "gorsel": self._view(j, fid, mode)}
@@ -171,6 +216,10 @@ class Api:
             out["omuz_fark"] = None
         out["bg"] = dict(j.bg)
         out["geom"] = dict(j.geom)
+        try:
+            out["kadraj"] = self._kadraj(j, fmt) if j.analyzed else None
+        except Exception:
+            out["kadraj"] = None
         out["duzeltme_sayisi"] = len(j.edits)
         if j.matted:
             M, (Wc, Hc), ppm, s = j.transform(fmt, EDIT_MULT)
@@ -292,8 +341,18 @@ class Api:
             j = self._jobs[jid]
             if not j.analyzed:
                 j.analyze(self._p)
-            j.bg = dict(DEFAULT_BG)
+                j.bg = dict(DEFAULT_BG)
             # ön kontrol için hızlı maske
+            st = self._state(j, fid, "once")
+            st["orijinal"] = to_b64(j.orig, 1400)
+            st["arsiv_no"] = storage.next_archive_no()
+            return st
+        return self._safe(go)
+
+    def durum_al(self, jid, fid):
+        """Kaldığı yerden devam: analizi yeniden yapmadan fotoğrafın mevcut durumunu döndürür."""
+        def go():
+            j = self._jobs[jid]
             st = self._state(j, fid, "once")
             st["orijinal"] = to_b64(j.orig, 1400)
             st["arsiv_no"] = storage.next_archive_no()
@@ -958,6 +1017,11 @@ class Api:
         return storage.public_settings()
 
     def update_settings(self, changes, pw=""):
+        if "kenar_modu" in changes:
+            import engine.job as _J
+            _J.KENAR_MODU = changes["kenar_modu"] if changes["kenar_modu"] in ("uzat", "doldur", "yumusat") else "uzat"
+            for _j in self._jobs.values():
+                _j._final = None
         return self._safe(lambda: {"ayarlar": (storage.update_settings(changes, pw), storage.public_settings())[1]})
 
     def ogrenme_durum(self):

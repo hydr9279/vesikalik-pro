@@ -2,6 +2,12 @@
 HAYDAR ALTINSABAN yapımıdır · Tüm hakları saklıdır
 HAYAL MEDYA · 0312 264 0 888 · Haydar Altınsaban · 0554 990 49 59
 
+SÜRÜM 1.4.7
+- Listeden bir fotoğrafa dönünce kaldığı adımdan devam eder (adım, ebat, adet, müşteri adı korunur); arka plan ayarları sıfırlanmaz. Listede adım adı görünür.
+- Kadraj kontrolü: fotoğraf seçilen ebat için küçükse/eksik kenar varsa ilk adımda uyarı; "Yakınlaştır", "Yine de devam" ve "Bu fotoğrafı çıkar" seçenekleri.
+- Ayarlar: fotoğraf dışı kenarlar için "Kenarı uzat / Uzat ve yumuşat / Arka planla doldur".
+- Açılır panellerde ilk kontrol ve fon bölümleri varsayılan açık.
+
 SÜRÜM 1.4.6
 - Sağ paneldeki tüm bölüm başlıkları Camera Raw gibi açılıp kapanır; durum hatırlanır.
 - "Kamera klasörü" özelliği kaldırıldı.

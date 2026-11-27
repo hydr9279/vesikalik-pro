@@ -48,6 +48,26 @@ def _key(d) -> str:
     return hashlib.md5(json.dumps(d, sort_keys=True, default=str).encode()).hexdigest()
 
 
+KENAR_MODU = "uzat"   # fotoğraf dışı kenarlar: uzat | doldur | yumusat (Ayarlar'dan değişir)
+
+
+def _kenar_yumusat(img, inb):
+    """Fotoğraf dışına uzatılan bölgeyi bulanıklaştırıp uzaklaştıkça karartır (çizgi görünümünü gizler)."""
+    H, W = inb.shape
+    out_ = (inb < 0.5).astype(np.uint8)
+    if not out_.any():
+        return img
+    sg = max(3.0, H * 0.012)
+    bl = cv2.GaussianBlur(img, (0, 0), sg).astype(np.float32)
+    bl = cv2.GaussianBlur(bl, (0, 0), sg * 2)
+    dist = cv2.distanceTransform(out_, cv2.DIST_L2, 3)
+    fade = 1 - 0.4 * np.clip(dist / (H * 0.12), 0, 1)
+    m = np.clip(1 - inb, 0, 1)
+    m = cv2.GaussianBlur(m, (0, 0), 2.0)[..., None]
+    res = img.astype(np.float32) * (1 - m) + bl * fade[..., None] * m
+    return np.clip(res, 0, 255).astype(np.uint8)
+
+
 class Job:
     def __init__(self, path: str):
         self.path = path
@@ -798,9 +818,21 @@ class Job:
             k = int(1 / s)
             src = cv2.GaussianBlur(src, (0, 0), 0.4 * k)
         canvas = cv2.warpAffine(src, M, (Wc, Hc), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+        ih_, iw_ = src.shape[:2]
+        mod = KENAR_MODU
+        inb = None
+        if mod in ("doldur", "yumusat"):
+            inb = cv2.warpAffine(np.ones((ih_, iw_), np.float32), M, (Wc, Hc), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+            inb = np.clip((inb - 0.5) * 2, 0, 1)
+            if inb.min() >= 1:
+                inb = None
+        if inb is not None and mod == "yumusat":
+            canvas = _kenar_yumusat(canvas, inb)
         if self.A is None:
             return self._finish(canvas, fmt, preview)
         A = cv2.warpAffine(self._shaped(self.A) if stage != "raw" else self.A, M, (Wc, Hc), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+        if inb is not None and mod == "doldur":
+            A = A * inb
         if show_alpha:
             return (A * 255).astype(np.uint8)
         bg = self.bg
@@ -809,6 +841,12 @@ class Job:
             tip = "original" if fmt["fon"] == "original" else "solid"
         if tip == "original":
             out = canvas.astype(np.float32)
+            if inb is not None and mod == "doldur":
+                wgt = inb * (1 - A) * (A < 0.05)
+                if wgt.sum() > 50:
+                    sm0 = _smooth_fill(out, wgt, 1 / 14)
+                    miss = (1 - inb)[..., None]
+                    out = out * (1 - miss) + sm0 * miss
             inv = (1 - A)[..., None]
             if bg.get("fon_temizle", 0) > 0:
                 smooth = _smooth_fill(out, 1 - A, 1 / 25)
@@ -820,6 +858,8 @@ class Job:
             out = np.clip(out, 0, 255).astype(np.uint8)
         else:
             Fg = cv2.warpAffine(self._shaped(self._foreground()), M, (Wc, Hc), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+            if inb is not None and mod == "yumusat":
+                Fg = _kenar_yumusat(Fg, inb)
             back = self._background(fmt, bg, tip, Wc, Hc)
             a = A[..., None]
             out = np.clip(Fg.astype(np.float32) * a + back * (1 - a), 0, 255).astype(np.uint8)

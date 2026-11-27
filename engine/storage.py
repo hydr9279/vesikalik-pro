@@ -38,6 +38,7 @@ def _default_settings() -> dict:
         "gpu_kullan": True,
         "sablon_goster": True,
         "model": "auto",
+        "kenar_modu": "uzat",      # fotoğraf dışı kenarlar: uzat | doldur | yumusat
         "ogrenme_kayit": True,     # yerel, yalnız sayısal rötuş ayarları; fotoğraf/isim içermez
     }
 

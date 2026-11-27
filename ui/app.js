@@ -101,7 +101,7 @@ function siraCiz() {
   $("#siraSay").textContent = S.isler.length;
   S.isler.forEach(j => {
     const durum = j.durum || "";
-    const e = h(`<div class="sira-oge ${j.id === S.cur ? "secili" : ""}" title="${esc(j.ad)}"><img src="${j.kucuk}" alt=""><div><div class="ad">${esc(j.ad)}</div><div class="alt-y">${esc(j.not || "Bekliyor")}</div></div><span class="nokta ${durum}"></span><button class="sil" title="Sıradan çıkar">✕</button></div>`);
+    const e = h(`<div class="sira-oge ${j.id === S.cur ? "secili" : ""}" title="${esc(j.ad)}"><img src="${j.kucuk}" alt=""><div><div class="ad">${esc(j.ad)}</div><div class="alt-y">${j.kayit && j.kayit.adim > 0 ? `<b>${ADIM_AD[j.kayit.adim]}</b> · ` : ""}${esc(j.not || "Bekliyor")}</div></div><span class="nokta ${durum}"></span><button class="sil" title="Sıradan çıkar">✕</button></div>`);
     e.onclick = (ev) => { if (ev.target.classList.contains("sil")) return; isSec(j.id); };
     $(".sil", e).onclick = async () => { await api.remove_job(j.id); S.isler = S.isler.filter(x => x !== j); if (S.cur === j.id) { S.cur = null; S.st = null; S.adim = 0; } ciz(); };
     l.append(e);
@@ -135,7 +135,26 @@ function ekle(r) {
   r.forEach(x => { if (x.hata) bildir(x.hata, true); else S.isler.push({...x, durum: "", not: "Bekliyor"}); });
   if (!S.cur && S.isler.length) isSec(S.isler[0].id); else ciz();
 }
+const ADIM_AD = ["Başlangıç", "Arka plan", "Rötuş", "Ölçekleme", "Baskı"];
+function kayitAl() {   // fotoğrafın ekrandaki yerini sakla: listeden dönünce kaldığı adımdan devam etsin
+  const j = isBul(S.cur);
+  if (j && S.st && !S.ana && S.adim > 0) j.kayit = {adim: S.adim, fid: S.fid, bilgi: {...S.bilgi}, rArac: S.rArac, arac: S.arac};
+}
 async function isSec(id) {
+  kayitAl();
+  const j = isBul(id);
+  if (j && j.analizli && j.kayit && S.cur !== null) {
+    const k = j.kayit;
+    S.ana = false; S.cur = id; S.sayfa = null; S.fid = k.fid; S.bilgi = {...k.bilgi}; S.rArac = k.rArac; S.arac = k.arac; S.gorunum = "sonuc";
+    const r = await cagir("durum_al", id, S.fid);
+    if (r.ok) {
+      S.st = r; S.adim = k.adim; durumGuncelle();
+      if (S.adim === 1 || S.adim === 3) await gorunumYenile("sonuc");
+      ciz();
+      if (S.adim === 4) await sayfaHazirla();
+      return;
+    }
+  }
   S.ana = false; S.cur = id; S.adim = 0; S.st = null; S.sayfa = null;
   ciz();
   await analiz();
@@ -727,7 +746,7 @@ function kaydirici(ad, etiket, deger, min, max, adim, birim, degisti, bilgi = ""
   return e;
 }
 // Açılır/kapanır bölüm (Camera Raw gibi). Durum hatırlanır; varsayılan: yalnızca iş başındaki bölümler açık.
-const ACIK_VARSAYILAN = new Set(["BİLGİLER", "YAPAY ZEKA MODELİ", "KONTROL EDİLMESİ GEREKENLER", "LEKE VE SİVİLCE · LaMa", "STANDART", "İNCE AYAR", "UYGUNLUK RAPORU", "KAĞIT", "KAYIT", "YAZICI", "ONAY"]);
+const ACIK_VARSAYILAN = new Set(["BİLGİLER", "YAPAY ZEKA MODELİ", "KONTROL EDİLMESİ GEREKENLER", "LEKE VE SİVİLCE · LaMa", "STANDART", "İNCE AYAR", "UYGUNLUK RAPORU", "KAĞIT", "KAYIT", "YAZICI", "ONAY", "HIZLI ÖN KONTROL", "KADRAJ KONTROLÜ", "OTOMATİK", "FON"]);
 function panelDurum(ad, yeni) {
   let m = {};
   try { m = JSON.parse(localStorage.getItem("hm_paneller") || "{}"); } catch (e) {}
@@ -807,6 +826,18 @@ function panelBaslangic(p) {
     k.append(h(`<div class="not">Sorun varsa müşteri hâlâ buradayken yeniden çekebilirsiniz.</div>`));
     k.append(uygunlukListe(S.st.uygunluk.filter(c => ["Tek yüz", "Gözler açık", "Ağız kapalı", "Baş dönüklüğü", "Gözlük", "Işık dengesi", "Netlik"].includes(c.ad))));
     p.append(k);
+  }
+  const kd = S.st?.kadraj;
+  if (kd && kd.sorun) {
+    const yon = {alt: "alt", ust: "üst", sol: "sol", sag: "sağ"};
+    const eks = Object.entries(kd.eksik).filter(([, v]) => v > 0.02).map(([k]) => yon[k]);
+    const kb = bolum("KADRAJ KONTROLÜ");
+    kb.append(h(`<div class="uyari-kutu"><b>Fotoğraf bu ebat için yetersiz olabilir.</b>${eks.length ? `<div>${eks.join(", ")} tarafta fotoğraf kadrajı karşılamıyor; program eksik yeri otomatik tamamlayacak.</div>` : ""}${kd.buyutme > 1.2 ? `<div>Çözünürlük düşük: fotoğraf %${Math.round((kd.buyutme - 1) * 100)} büyütülerek basılacak, keskinlik azalabilir.</div>` : ""}</div>`));
+    const bt = h(`<div class="satir" style="flex-wrap:wrap;gap:6px"><button class="btn kucuk ana" id="kdYak" title="Ölçeklemede olabildiğince yakınlaştır — Baş ölçüsü sınırını aşmadan fotoğrafı büyütüp eksik kenarları kapatmaya çalışır">Yakınlaştır</button><button class="btn kucuk" id="kdDev" title="Yine de devam et — Eksik yerler olduğu gibi tamamlanır">Yine de devam</button><button class="btn kucuk" id="kdCik" title="Bastırma — Bu fotoğrafı sıradan çıkarır">Bu fotoğrafı çıkar</button></div>`);
+    $("#kdYak", bt).onclick = async () => { const r = await cagir("kadraj_doldur", S.cur, S.fid); if (r.ok) { S.st = {...S.st, ...r}; bildir(r.doldur.tamam ? "Eksik kenarlar kapatıldı" : "Baş ölçüsü sınırına kadar yakınlaştırıldı; bir kısım eksik kaldı"); ciz(); } };
+    $("#kdDev", bt).onclick = () => { S.st.kadraj = {...kd, sorun: false}; ciz(); };
+    $("#kdCik", bt).onclick = async () => { const j = isBul(S.cur); await api.remove_job(j.id); S.isler = S.isler.filter(x => x !== j); S.cur = null; S.st = null; S.adim = 0; ciz(); bildir("Fotoğraf listeden çıkarıldı"); };
+    kb.append(bt); p.prepend(kb);
   }
   const o = bolum("OTOMATİK");
   o.append(secim("hm", "Hızlı mod (sorun yoksa tüm adımlar otomatik)", S.ayar.hizli_mod, async v => { S.ayar.hizli_mod = v; await api.update_settings({hizli_mod: v}); }));
@@ -1105,7 +1136,7 @@ function anaMenu() {
   try { kapat(); } catch (_) {}
   try { modulKapat(); } catch (_) {}
   if (MV && MV.acik) return;   // manuel ekran açıkken önce Uygula/İptal
-  S.ana = true; S.adim = 0; ciz();
+  kayitAl(); S.ana = true; S.adim = 0; ciz();
 }
 document.addEventListener("keydown", (e) => { if (e.altKey && e.key === "Home") { e.preventDefault(); anaMenu(); } });
 
@@ -1212,6 +1243,10 @@ async function ayarlar(sekme = "genel") {
     api.ogrenme_durum().then(r => { $("#ogSay", ogs).textContent = r.kayit + " kayıt"; });
     $("#ogSil", ogs).onclick = async () => { const r = await cagir("ogrenme_sil"); if (r.ok !== false) { $("#ogSay", ogs).textContent = "0 kayıt"; bildir("Öğrenme kayıtları silindi"); } };
     g.append(ogs);
+    const kmod = h(`<div class="alan"><label>Fotoğraf dışında kalan kenarlar (dar çekimlerde)</label><select><option value="uzat">Kenarı uzat (varsayılan)</option><option value="yumusat">Uzat ve yumuşat (bulanık, aşağı kararan)</option><option value="doldur">Arka planla doldur</option></select></div>`);
+    $("select", kmod).value = S.ayar.kenar_modu || "uzat";
+    $("select", kmod).onchange = (e) => kaydetA({kenar_modu: e.target.value});
+    g.append(kmod);
     g.append(secim("sb2", "Ölçeklemede şablonu göster", S.ayar.sablon_goster !== false, v => kaydetA({sablon_goster: v})));
     const ms = h(`<div class="alan"><label>Arka plan modeli</label><select><option value="auto">Otomatik</option><option value="birefnet">BiRefNet Portre</option><option value="isnet">ISNet</option><option value="u2net">U²-Net</option></select></div>`);
     $("select", ms).value = S.ayar.model || "auto"; $("select", ms).onchange = (e) => kaydetA({model: e.target.value});
@@ -1344,9 +1379,10 @@ function hakkinda() {
     <div style="font-weight:700;letter-spacing:.03em">HAYDAR ALTINSABAN yapımıdır · Tüm hakları saklıdır</div>
     <div class="not">HAYAL MEDYA · 0312 264 0 888 &nbsp;·&nbsp; Haydar Altınsaban · 0554 990 49 59</div></div>
     <div class="modal-ic">
-    <h3 style="margin:0;font-size:13px;color:var(--soluk);letter-spacing:.08em">SÜRÜM NOTLARI · 1.4.6</h3>
+    <h3 style="margin:0;font-size:13px;color:var(--soluk);letter-spacing:.08em">SÜRÜM NOTLARI · 1.4.7</h3>
     <ul class="not" style="margin:0;padding-left:18px;line-height:1.7;color:var(--yazi)">
-      <li><b>Yeni (1.4.6):</b> Başlıklar açılır/kapanır; yeni Seç aracı (V); Geri/İleri okları ve bilgi satırı; leke noktaları kırmızı→yeşil, sağ tıkla ayar/silme; Ön ayar kaydet; Kamera klasörü kaldırıldı.</li>
+      <li><b>Yeni (1.4.7):</b> Listeden fotoğrafa dönünce kaldığı adımdan devam; kadraj kontrolü uyarısı; kenar tamamlama ayarı.</li>
+      <li><b>1.4.6:</b> Başlıklar açılır/kapanır; yeni Seç aracı (V); Geri/İleri okları ve bilgi satırı; leke noktaları kırmızı→yeşil, sağ tıkla ayar/silme; Ön ayar kaydet; Kamera klasörü kaldırıldı.</li>
       <li><b>1.4.5:</b> Çubuklar sürüklenirken canlı etki eder (ölçekleme, fon, ışık/renk, omuz, Polaroid/Serbest); İt/çek, Şişir, Küçült fırçaları sürüklerken sonucu canlı gösterir; klon damgasında Alt basılıyken örnek alınacak bölge imleçte görünür; ticari olmayan modeller kapalı başlar; Polaroid dolgusu yumuşatıldı.</li>
       <li><b>Düzeltme (1.4.4):</b> İlk açılışta "yanıt vermiyor" sorunu için kalıcı pencere profili; yükleme ekranı arayüz yüklenene kadar açık kalır.</li>
       <li><b>Yeni (1.4.3):</b> Her ekranda Ana menü düğmesi; Polaroid ve Serbest Baskı'da fotoğrafa çift tıklayınca tam sayfa düzenleme (kaydır, yakınlaştır, renk, sıfırla).</li>
