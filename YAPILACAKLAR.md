@@ -13,3 +13,11 @@ Açılır/kapanır paneller, Kamera klasörünü kaldırma, üst bar sadeleştir
 ## 1.4.6 ile yapılanlar
 - Arayüz toplu işi (ekran01–11) tamamlandı. Öğrenme günlüğü (ogrenme.jsonl, yalnız sayılar) eklendi; öneri arayüzü sonraki sürüm.
 - Not: yeşil leke işaretine sağ tık anında siler ve bölgeyi eski haline döndürür (ayrı "tekrar Uygula" gerekmez).
+
+## Photoshop köprüsü (ayrı proje, sonra)
+- Fikir: Photoshop'a (UXP) bir panel eklentisi; mevcut program arkada yerel motor olarak çalışır.
+- Panel açık fotoğrafı programa gönderir, sonuç Photoshop'a katman/maske olarak döner (arka plan çıkarma, leke temizleme, biyometrik kadraj, baskı sayfası).
+- Photoshop'ta zaten olan işler için Action tarzı komut dizileri panelin içinde yazılır.
+- İlk sürüm önerisi: yalnızca arka plan çıkarma + leke temizleme.
+- Kullanıcı istediği eklenti özelliklerini ve Action'ları daha sonra anlatacak; o zaman güncelleme olarak planlanacak.
+- Not: Photoshop sandbox'ta yok; her adım kullanıcının Photoshop'unda denenmeli.
